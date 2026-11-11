@@ -9,9 +9,20 @@ Client: **Ashyan Zafar**, film editor. Brief: luxury, cinematic, **black · whit
 | **Nick Clement** — nickclement.com | Rotating client logos | Slow, continuous logo marquee. Logos are white marks on dark rounded tiles (≈ 130×90), edges fade out. → `ClientMarquee` | The 1-col product-design layout |
 | **Taha Seder** — tahaseder.com | Fonts | **Instrument Serif** for huge display type (tight −3.5% tracking, italic accent word in colour). **JetBrains Mono** for tiny uppercase labels with wide tracking. **Geist** for body text. Also: numbered nav (`01 WORK`), the `REC · 24 FPS` and live-clock details | His orange accent |
 | **Moodboard** — `assets/Cinematic Film Editor Portfolio.png` | "Something I found interesting" (already uses Ashyan's name) | The page structure: dark hero with a portrait and serif headline, then a work grid (2 wide + 3 narrow; we render it on **black**, since the ivory version clashed with black/white/red), then an image / about / capabilities / let's-talk row on white paper, then a dark footer | Its beige/sepia palette, which becomes ivory + red |
-| **CUTLINE** — "Visual Post-Production Studio" | First page | ⚠️ **Not found.** cutlinestudio.ai (a SaaS) and cutlineproduction.com (a UAE studio) don't match the title. **Need the URL from the client.** | — |
+| **CUTLINE** — cutline.in ("CUTLINE \| Visual Post-Production Studio") | First page | The **intro / first screen**: a full-viewport black hero whose backdrop is a blurred, grayscale, vignetted screenshot of an NLE timeline (clips, waveforms, a thin playhead). After ~2s a huge wordmark assembles in the centre: "Cut \| Line", where the "t" is a blade, red dots act as accents and a vertical cut line splits the two words. "VISUAL" sits below in red spaced caps, with an italic tagline ("Edit With Precision. Create with Soul.") and a red bouncing "Scroll to explore" chevron. Header has a pulsing location dot. Work thumbnails are `grayscale(1)` and numbered "01 · MUMBAI / VISUALS". → We use this as our **intro sequence** (see "Intro" below) | Inter Black italic caps, orange accent, the carousel |
 | **Mario Monteiro** — mariomonteiro.tv | "Perfect visual example, but not the font and colours" | Page flow: hero → client strip with hairlines → Featured Work 3-col grid with fade-up reveals → mixed-type manifesto (*serif italic* + SANS CAPS) → centred "Let's craft something together" CTA with email + arrow → footer | Syne wide display font and the orange/black palette |
 | **Zylitch** — zylitch-next.vercel.app | Cursor: "instead of a square I want a blade" | A custom cursor that follows movement direction (theirs is a paw trail using `atan2`). Ours is a **blade**: a scalpel that tilts with mouse speed, a red slash on click, and a PLAY ring over video cards. → `BladeCursor` | The pink theme and the cat |
+
+## Intro (from CUTLINE)
+
+The first screen plays a short "edit" before revealing the hero. It takes under 1.6s, never blocks LCP (the hero image paints underneath), runs only once per session, and is skippable on scroll, click or key.
+
+1. Black screen with a blurred, grayscale **timeline backdrop** (a still of Ashyan's real edit timeline: clips, waveforms) at about 25% opacity with a heavy vignette.
+2. A red **playhead** sweeps left to right across it, with a running timecode.
+3. As it passes, the name **ASHYAN | ZAFAR** is "cut" in: the two words slide in from either side of a thin vertical cut line. Instrument Serif, with a red dot accent and "FILM EDITOR" in red mono caps underneath.
+4. Hard cut (one frame of black), then the hero is revealed. The header's REC dot keeps pulsing.
+
+On mobile the playhead sweeps top to bottom and the name stacks. Under reduced motion it's a static frame that fades in 200ms. Tracked in issue #18.
 
 ## Palette
 
