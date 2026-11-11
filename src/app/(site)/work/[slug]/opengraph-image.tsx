@@ -1,77 +1,114 @@
-import { ImageResponse } from "next/og";
-import sharp from "sharp";
 import { getProject } from "@/features/content/projects";
-import { loadGoogleFont } from "@/features/seo/og-font";
-import { absoluteUrl } from "@/lib/site-url";
+import { getSite } from "@/features/content/queries";
+import {
+  OG_COLORS as C,
+  OG_CONTENT_TYPE,
+  OG_SIZE,
+  ogBackground,
+  ogFont,
+  ogJpeg,
+} from "@/features/seo/og-card";
 
+/** Per-film share card: the cover still, the title in Instrument Serif, format · year. JPEG, inputs cached. */
 export const alt = "Film by Ashyan Zafar";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
-
-/** Satori can't decode WebP/AVIF, so the cover is re-encoded to a 1200px JPEG data URL. */
-async function coverDataUrl(src: string) {
-  const url = src.startsWith("http") ? src : absoluteUrl(src);
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const jpeg = await sharp(Buffer.from(await res.arrayBuffer()))
-      .resize(1200, 630, { fit: "cover" })
-      .jpeg({ quality: 82 })
-      .toBuffer();
-    return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
+export const size = OG_SIZE;
+export const contentType = OG_CONTENT_TYPE;
 
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const p = await getProject(slug);
-  const title = p?.title ?? "Ashyan Zafar";
-  const meta = p ? `${p.format} · ${p.year}` : "Film Editor";
-  const [cover, serif] = await Promise.all([
-    p ? coverDataUrl(p.cover.src) : null,
-    loadGoogleFont("Instrument Serif", title),
+  const [p, site] = await Promise.all([getProject(slug), getSite()]);
+  const title = p?.title ?? site.name;
+  const meta = p ? [p.format, p.clientName, p.year].filter(Boolean).join("  ·  ") : site.role;
+  const [cover, monogram, serif] = await Promise.all([
+    p ? ogBackground(p.cover.src) : null,
+    ogBackground("/apple-icon.png", 180, 180),
+    ogFont("Instrument Serif", title),
   ]);
+  const words = site.name.toUpperCase().split(" ");
 
-  return new ImageResponse(
-    (
-      <div style={{ width: "100%", height: "100%", display: "flex", position: "relative", background: "#0a0a0a" }}>
-        {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" width={1200} height={630} style={{ position: "absolute", inset: 0, objectFit: "cover" }} />
-        ) : null}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(10,10,10,0.55) 55%, rgba(10,10,10,0.1) 100%)",
-          }}
+  return ogJpeg(
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        position: "relative",
+        background: C.ink,
+      }}
+    >
+      {cover ? (
+        // eslint-disable-next-line @next/next/no-img-element -- Satori renders <img>
+        <img
+          src={cover}
+          alt=""
+          width={1200}
+          height={630}
+          style={{ position: "absolute", inset: 0, objectFit: "cover" }}
         />
-        <div style={{ position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 64, width: "100%" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, color: "#f4f1ec", fontSize: 20, letterSpacing: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 10, background: "#c1121f" }} />
-            ASHYAN ZAFAR
+      ) : null}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(10,10,10,0.55) 55%, rgba(10,10,10,0.1) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: 64,
+          width: "100%",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {monogram ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Satori renders <img>
+            <img
+              src={monogram}
+              alt=""
+              width={56}
+              height={56}
+              style={{ border: "1px solid #262626" }}
+            />
+          ) : null}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              color: C.ivory,
+              fontSize: 20,
+              letterSpacing: 9,
+            }}
+          >
+            {words[0]}
+            <span style={{ color: C.red, margin: "0 12px" }}>·</span>
+            {words.slice(1).join(" ")}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div style={{ width: 72, height: 2, background: "#c1121f" }} />
-            <div
-              style={{
-                fontFamily: serif ? "Instrument Serif" : "serif",
-                fontSize: title.length > 22 ? 84 : 104,
-                lineHeight: 0.95,
-                color: "#f4f1ec",
-                letterSpacing: -2,
-                maxWidth: 900,
-              }}
-            >
-              {title}
-            </div>
-            <div style={{ color: "#8c8984", fontSize: 22, letterSpacing: 6 }}>{meta.toUpperCase()}</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ width: 72, height: 2, background: C.red }} />
+          <div
+            style={{
+              fontFamily: serif ? "Instrument Serif" : "serif",
+              fontSize: title.length > 22 ? 84 : 104,
+              lineHeight: 0.95,
+              color: C.ivory,
+              letterSpacing: -2,
+              maxWidth: 900,
+            }}
+          >
+            {title}
+          </div>
+          <div style={{ display: "flex", color: C.smoke, fontSize: 22, letterSpacing: 6 }}>
+            {meta.toUpperCase()}
           </div>
         </div>
       </div>
-    ),
-    { ...size, fonts: serif ? [{ name: "Instrument Serif", data: serif, style: "normal", weight: 400 }] : [] },
+    </div>,
+    [{ name: "Instrument Serif", data: serif }],
   );
 }

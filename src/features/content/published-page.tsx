@@ -35,6 +35,13 @@ export async function pageMetadata(
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: path },
+    // Explicit: setting openGraph here replaces the root segment's, image included (shallow merge).
+    openGraph: {
+      title,
+      description,
+      url: path,
+      images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: title }],
+    },
+    twitter: { card: "summary_large_image", title, description, images: ["/opengraph-image"] },
   };
 }
