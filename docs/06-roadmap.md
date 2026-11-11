@@ -14,12 +14,12 @@ Tracked as GitHub issues, labelled `phase-1` … `phase-6`, plus `decision` for 
 | Phase | Scope | Status |
 |---|---|---|
 | **0 · Foundation** | Next 16 + TS + Tailwind v4 + shadcn, pnpm, Prisma 7 + Neon schema, Better Auth, env validation, design tokens, fonts, home page from fallback content, blade cursor, SEO basics (metadata, JSON-LD, sitemap, robots, llms.txt), plan docs | ✅ Done |
-| **1 · Data wiring** | Neon project + first migration, seed, `features/content` cached queries, home reads `publishedData`, project pages `/work/[slug]` with `generateStaticParams` | In progress: #2 (needs the first admin + hosting env), #3 done, #4 next |
-| **2 · Media** | Pick storage (docs/03), `features/media` adapter, Media library UI, direct uploads, blur/dominant colour, Mux webhook, `VideoLoop` + `FilmPlayer` | In progress: storage module + pipeline done (#5); media library UI (#6) and players (#7) next |
-| **3 · Visual editor** | `/preview/[slug]`, 3-pane editor, schema-driven inspector, dnd reorder, autosave, publish + revisions, device toggles | |
-| **4 · Projects, Clients, Inbox, Settings** | CRUD screens, contact form + email notification, marquee logo management | |
+| **1 · Data wiring** | Neon project + first migration, seed, `features/content` cached queries, home reads `publishedData`, project pages `/work/[slug]` with `generateStaticParams` | ✅ Done (#2, #3, #4) — hosting env moves to #21 |
+| **2 · Media** | Pick storage (docs/03), `features/media` adapter, Media library UI, direct uploads, blur/dominant colour, Mux webhook, `VideoLoop` + `FilmPlayer` | ✅ Done (#5, #6, #7) — Mux + Vercel Blob live |
+| **3 · Visual editor** | `/preview/[slug]`, 3-pane editor, schema-driven inspector, dnd reorder, autosave, publish + revisions, device toggles | ✅ Done (#8, #9, #10) |
+| **4 · Projects, Clients, Inbox, Settings** | CRUD screens, contact form + email notification, marquee logo management | ✅ Done except the email notification (#13 open) |
 | **5 · Analytics** | Beacon, ingest, rollups, dashboard (docs/04) | |
-| **6 · Polish & launch** | Reveal animations, Lenis, preloader, OG images, VideoObject JSON-LD, Lighthouse pass on mobile, real content, replace `public/media` stand-ins with real stills, domain + Vercel deploy | |
+| **6 · Polish & launch** | Reveal animations, Lenis, CUTLINE-style intro, OG images ✅, VideoObject JSON-LD ✅, Lighthouse pass on mobile, real content, replace `public/media` stand-ins with real stills, domain + Vercel deploy | |
 
 ## Open questions for the client
 

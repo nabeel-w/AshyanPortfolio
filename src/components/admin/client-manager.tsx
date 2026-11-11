@@ -38,7 +38,10 @@ export function ClientManager({ initial, fallbackNames }: { initial: ClientRow[]
   function save() {
     startTransition(async () => {
       try {
-        await saveClients(rows.map((r) => ({ id: r.id, name: r.name, url: r.url, logoId: r.logo?.id ?? null, visible: r.visible })));
+        const ids = await saveClients(
+          rows.map((r) => ({ id: r.id, name: r.name, url: r.url, logoId: r.logo?.id ?? null, visible: r.visible })),
+        );
+        setRows((current) => current.map((r, i) => ({ ...r, id: ids[i] ?? r.id })));
         setDirty(false);
         toast.success("Marquee saved — it's live");
       } catch (e) {

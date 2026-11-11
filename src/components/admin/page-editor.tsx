@@ -48,7 +48,14 @@ type Page = {
 
 export function PageEditor({ page, types }: { page: Page; types: { type: string; label: string; description: string }[] }) {
   const router = useRouter();
+  // Local copy for optimistic reorder/visibility; re-synced whenever the server sends fresh data
+  // (router.refresh() after publish / discard / restore).
   const [sections, setSections] = useState(page.sections);
+  const [serverSections, setServerSections] = useState(page.sections);
+  if (serverSections !== page.sections) {
+    setServerSections(page.sections);
+    setSections(page.sections);
+  }
   const [pending, startTransition] = useTransition();
   const [device, setDevice] = useState<Device>("desktop");
   const [adding, setAdding] = useState(false);

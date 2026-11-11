@@ -33,13 +33,17 @@ export async function saveClients(rows: ClientRowInput[]) {
   const list = z.array(clientRow).max(200).parse(rows);
   const keep = list.map((r) => r.id).filter((x): x is string => Boolean(x));
 
-  await db.$transaction(async (tx) => {
+  const ids = await db.$transaction(async (tx) => {
     await tx.client.deleteMany({ where: keep.length ? { id: { notIn: keep } } : {} });
+    const saved: string[] = [];
     for (const [order, r] of list.entries()) {
       const data = { name: r.name, url: r.url, logoId: r.logoId, visible: r.visible, order };
-      if (r.id) await tx.client.update({ where: { id: r.id }, data });
-      else await tx.client.create({ data });
+      const row = r.id ? await tx.client.update({ where: { id: r.id }, data }) : await tx.client.create({ data });
+      saved.push(row.id);
     }
+    return saved;
   });
   invalidate.clients();
+  /** Saved ids in list order, so the editor can attach ids to newly created rows. */
+  return ids;
 }

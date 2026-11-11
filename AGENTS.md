@@ -26,6 +26,7 @@ pnpm db:deploy      # apply committed migrations (prod/CI)
 pnpm db:seed        # tsx prisma/seed.ts: site settings + home sections (idempotent)
 pnpm admin:create <email> "<Name>"   # create/reset an admin; hidden password prompt or ADMIN_PASSWORD env
 pnpm media:check    # storage routing, missing env per provider, live credential ping
+pnpm seed:media <clips-dir>   # push stand-in stills (Blob) + ffmpeg-cut loops/showreel (Mux) and create demo projects
 pnpm test           # Vitest: unit (node) + components (jsdom) · test:watch · test:unit · test:components · test:coverage
 pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after deleting .next
 ```
@@ -42,11 +43,17 @@ pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after 
 - **Tailwind v4** runs through the `@tailwindcss/turbopack` loader (set in `next.config.ts`). There's no tailwind.config; tokens live in `src/app/globals.css` under `@theme inline`. Editor CSS lint warnings about `@theme`/`@apply` are harmless.
 - **shadcn** style `base-nova` uses **Base UI** primitives (`@base-ui/react`), not Radix. `cn` is imported from the **`cn` package** (`src/lib/utils.ts` re-exports it). Add components with `pnpm dlx shadcn@latest add <name>`. The generated `hooks/use-mobile.ts` was rewritten to `useSyncExternalStore` to pass the React-hooks lint rule.
 - **Prisma pinned to 7.10.1** (`prisma`, `@prisma/client`, `@prisma/adapter-neon`). On npm, `latest` currently points to **8.0.0-rc**, so never bare-install `prisma`. Generator `prisma-client` outputs to `src/generated/prisma` (gitignored; `postinstall` regenerates it). Import from `@/generated/prisma/client`. The CLI config is `prisma.config.ts` (`prisma init` names it `prisma7.config.ts`; we renamed it). The runtime uses the pooled `DATABASE_URL` through `PrismaNeon`. **Migrations need the direct host**, so `prisma.config.ts` takes `DIRECT_URL` (or `DATABASE_URL`) and strips `-pooler.` automatically. A pooler URL pasted into `DIRECT_URL` is therefore harmless. `prisma.config.ts`, `prisma/seed.ts` and `scripts/*` load **`.env.local` then `.env`** with dotenv, matching Next, so a separate `.env` isn't needed.
-- DB state (2026-11-11): Neon project in ap-southeast-1, database `neondb`. Migration `init` applied and seeded. No admin user yet; the owner runs `pnpm admin:create` with an email from `ADMIN_EMAILS`.
+- DB state (2026-11-11): Neon project in ap-southeast-1, database `neondb`. All migrations applied; seeded with pages home/work/about/contact, 5 demo projects (stills on Vercel Blob, loops + showreel on Mux) and 10 placeholder clients. Admin account = the email in `ADMIN_EMAILS`; its password is kept in `.env.local` as `ADMIN_PASSWORD` at the owner's request (never print or commit it).
+- **After `prisma generate` / a migration, restart any running dev/prod server**: the Prisma client is cached on `globalThis`, so a running server keeps the old schema ("Unknown argument …").
+- In Prisma 7 `migrate dev` does **not** run `generate`; run `pnpm exec prisma generate` yourself. Hand-edit generated SQL when it would drop/re-create a column with data (see `asset_provider_string`).
 - **pnpm 11** blocks install scripts unless whitelisted in `pnpm-workspace.yaml` → `allowBuilds` (prisma, @prisma/engines, sharp, esbuild, unrs-resolver). Add new native deps there.
 - **Better Auth 1.7**: `src/lib/auth.ts` (server, `server-only`), `src/lib/auth-client.ts`, handler `app/api/auth/[...all]`. Sign-up is restricted to `ADMIN_EMAILS` by a `databaseHooks.user.create.before` hook. `requireAdmin()` (`src/lib/session.ts`) is the real gate; proxy is optimistic only.
 - `src/lib/env.ts` validates env with zod at import. **Any server module importing db/auth needs a valid `.env.local`.** `.env.local` holds local placeholders; `.env.example` is the committed template (gitignore has `!.env.example`).
 - Seed and scripts run with **tsx** (Node type-stripping can't resolve the generated client's imports).
+- **`"use server"` files may only export async functions** (types are fine). Keep zod schemas un-exported there; shared helpers live in plain modules (e.g. `features/media/summary.ts`, `lib/whatsapp.ts`).
+- A Server Component can't call a function exported from a `"use client"` file. Put shared helpers in `src/lib`.
+- Admin/preview routes set `export const instant = false` (they read the session per request; Next 16 instant-navigation validation otherwise flags Better Auth's `Date.now()`).
+- Editing files: keep **LF** line endings. Python's text mode on Windows writes CRLF, which breaks exact-match edits; prefer the Edit tool or Node `fs` (strip `` before matching). Avoid giant bash heredocs with apostrophes (bash may fail to parse the whole command and write nothing).
 
 ## Architecture conventions
 
@@ -57,7 +64,10 @@ pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after 
 - Scripts that import `server-only` modules run as `tsx --conditions=react-server …`. Wrap top-level await in `main()` (tsx compiles `.ts` scripts to CJS), and on Windows use `pathToFileURL` for absolute dynamic imports.
 - Testing auth with curl: Better Auth rejects requests whose `Origin` isn't `BETTER_AUTH_URL` (`INVALID_ORIGIN`), so send `-H "Origin: http://localhost:3000"` even when the server runs on another port.
 - Headline micro-markup: `*italic red serif*`, `**SANS CAPS**` (rendered by `components/site/rich-text.tsx`). Never store HTML.
-- Server Components by default. Client islands only: `blade-cursor`, `timecode`, `mobile-menu`, `login-form`. Keep home-page JS ≤ 40 KB gz.
+- Server Components by default. Public client islands: `blade-cursor`, `timecode`, `mobile-menu`, `whatsapp-button`, `work-filter`, `video-loop`, `film-player` (Mux Player lazy-loaded on click), `contact-form`. Keep home-page JS ≤ 40 KB gz.
+- **Pages are CMS-driven**: home / work / about / contact all render `<PublishedPage slug>` (`features/content/published-page.tsx`). Sections carry draft columns (`data`, `order`, `visible`) and live columns (`publishedData`, `publishedOrder`, `publishedVisible`); only `publishPage()` copies draft → live, snapshots a `PageRevision` and calls `invalidate.page(slug)`. Removing a live section only hides it in the draft.
+- **Admin** (`/admin`): Pages (section list + drag reorder + publish/discard/revisions/SEO) → per-section editor (`components/admin/section-editor.tsx`: `SchemaForm` driven by `features/admin/fields.ts` + live iframe of `/preview/<slug>?section=<id>`, postMessage updates, 700 ms autosave), Projects, Media (direct uploads, polling for Mux while webhooks can't reach localhost), Clients (marquee builder), Inbox, Settings. Adding a section type = schema + component + registry entry + `sectionFields` entry (a test checks every field exists on its schema).
+- Destructive admin buttons use `ConfirmButton` (two clicks, disarms after 4 s). Never use `confirm()`/`alert()` (they block browser automation).
 - Section tones: `tone="ink"` (default) or `"paper"`. The `.tone-paper` class flips the semantic tokens.
 
 ## Design system (details in docs/01)
@@ -90,6 +100,10 @@ Client follow-ups: palette must be **black/white/red**, feel **luxury**, mobile 
 - Local-route tests write to `public/uploads/test-vitest/` and clean up after themselves.
 
 ## Testing tips
+
+- **Test with a production build** (`pnpm build && pnpm start`), not `pnpm dev` (owner's preference; dev also compiles slowly and its first requests can 500). Stopping a `pnpm start/dev` background task leaves the child `next` process on :3000; kill it via `Get-NetTCPConnection -LocalPort 3000`.
+- Browser screenshots hang (CDP timeout) on pages with a `position: sticky` element wrapping a `next/image fill`; the About bio portrait is deliberately not sticky.
+- `ConfirmButton` disarms after 4 s, so when automating, click it twice in the same batch.
 
 - The Chrome window is maximized, so `resize_window` doesn't change the viewport. To check phone layouts, replace the page with 390px-wide iframes of `/` via `javascript_tool` (same origin) and screenshot.
 - `curl -I localhost:3000/admin` should 307 to `/login?next=/admin` without a session cookie.
