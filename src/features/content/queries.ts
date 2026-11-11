@@ -1,7 +1,7 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { z } from "zod";
-import { homeSections, site as fallbackSite } from "@/content/fallback";
+import { pageSections, site as fallbackSite } from "@/content/fallback";
 import { sectionSchemas, type SectionData, type SectionProps } from "@/features/sections/schemas";
 import { db } from "@/lib/db";
 import { tags } from "./tags";
@@ -94,10 +94,38 @@ async function getClientLogos(): Promise<SectionProps<"clientMarquee">["clients"
   }));
 }
 
+/** Validate stored section rows against their schemas; invalid/unknown/unpublished rows are skipped. */
+export function parseSections(
+  rows: { id: string; type: string; data: unknown }[],
+  context: string,
+): SectionData[] {
+  const out: SectionData[] = [];
+  for (const row of rows) {
+    if (!(row.type in sectionSchemas) || row.data == null) continue;
+    const type = row.type as keyof typeof sectionSchemas;
+    const parsed = sectionSchemas[type].safeParse(row.data);
+    if (!parsed.success) {
+      console.warn(`[content] skipped invalid "${type}" section ${row.id} on ${context}:`, z.prettifyError(parsed.error));
+      continue;
+    }
+    out.push({ id: row.id, type, visible: true, data: parsed.data } as SectionData);
+  }
+  return out;
+}
+
+/** Fill collection sections from their tables when those have rows (work grid ← Project, marquee ← Client). */
+export async function hydrateSections(sections: SectionData[]): Promise<SectionData[]> {
+  const [projects, clients] = await Promise.all([getPublishedProjects(), getClientLogos()]);
+  return sections.map((s) => {
+    if (s.type === "workGrid" && projects.length) return { ...s, data: { ...s.data, projects } };
+    if (s.type === "clientMarquee" && clients.length) return { ...s, data: { ...s.data, clients } };
+    return s;
+  });
+}
+
 /**
- * A page's live sections, validated against the section schemas.
- * Collection sections are hydrated from their tables when those have rows
- * (work grid ← Project, client marquee ← Client); otherwise the section's own data is used.
+ * A page's LIVE sections: publishedData in publishedOrder, only publishedVisible ones.
+ * Pages with nothing published fall back to the placeholder content for known slugs.
  */
 export async function getPublishedPage(slug: string): Promise<SectionData[]> {
   "use cache";
@@ -106,29 +134,24 @@ export async function getPublishedPage(slug: string): Promise<SectionData[]> {
 
   const page = await db.page.findFirst({
     where: { slug, status: "PUBLISHED" },
-    include: { sections: { where: { visible: true }, orderBy: { order: "asc" } } },
+    include: { sections: { where: { publishedVisible: true }, orderBy: { publishedOrder: "asc" } } },
   });
 
-  const sections: SectionData[] = [];
-  for (const s of page?.sections ?? []) {
-    if (!(s.type in sectionSchemas) || s.publishedData == null) continue;
-    const type = s.type as keyof typeof sectionSchemas;
-    const parsed = sectionSchemas[type].safeParse(s.publishedData);
-    if (!parsed.success) {
-      console.warn(`[content] skipped invalid "${type}" section ${s.id} on /${slug}:`, z.prettifyError(parsed.error));
-      continue;
-    }
-    sections.push({ id: s.id, type, visible: true, data: parsed.data } as SectionData);
-  }
+  const sections = parseSections(
+    (page?.sections ?? []).map((s) => ({ id: s.id, type: s.type, data: s.publishedData })),
+    `/${slug}`,
+  );
+  if (!sections.length) return slug in pageSections ? pageSections[slug as keyof typeof pageSections] : [];
+  return hydrateSections(sections);
+}
 
-  if (!sections.length) return slug === "home" ? homeSections : [];
-
-  const [projects, clients] = await Promise.all([getPublishedProjects(), getClientLogos()]);
-  return sections.map((s) => {
-    if (s.type === "workGrid" && projects.length) return { ...s, data: { ...s.data, projects } };
-    if (s.type === "clientMarquee" && clients.length) return { ...s, data: { ...s.data, clients } };
-    return s;
-  });
+/** SEO fields for a page (admin-editable), with sensible fallbacks. */
+export async function getPageMeta(slug: string) {
+  "use cache";
+  cacheTag(tags.page(slug));
+  cacheLife("max");
+  const page = await db.page.findUnique({ where: { slug }, select: { title: true, seoTitle: true, seoDescription: true } });
+  return { title: page?.seoTitle || page?.title || null, description: page?.seoDescription || null };
 }
 
 /** Work list for sitemap / llms.txt: real projects, else whatever the home work grid shows. */

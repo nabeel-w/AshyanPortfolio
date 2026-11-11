@@ -3,12 +3,7 @@
 import { useEffect, useState } from "react";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { cn } from "@/lib/utils";
-
-/** Build a wa.me deep link: digits only, optional prefilled message. */
-export function whatsappHref(phone: string, message?: string) {
-  const digits = phone.replace(/\D/g, "");
-  return `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
-}
+import { whatsappHref } from "@/lib/whatsapp";
 
 /**
  * Floating WhatsApp CTA (Mario Monteiro pattern, our palette): a red circle with a soft ping ring,

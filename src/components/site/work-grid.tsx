@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { SectionProps } from "@/features/sections/schemas";
 import { VideoLoop } from "@/components/media/video-loop";
+import { WorkFilter } from "./work-filter";
 import { cn } from "@/lib/utils";
 
 type Project = SectionProps<"workGrid">["projects"][number];
@@ -34,22 +35,7 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
             aria-label="Filter work"
             className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
           >
-            <ul className="flex w-max gap-6">
-              {categories.map((c, i) => (
-                <li key={c}>
-                  <span
-                    className={cn(
-                      "label relative inline-block py-2",
-                      i === 0
-                        ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-red"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {c}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <WorkFilter categories={categories} />
           </nav>
         </div>
 
@@ -57,6 +43,7 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
           {projects.map((p, i) => (
             <li
               key={p.slug}
+              data-category={p.category}
               className={cn(i < 2 ? "lg:col-span-3" : "lg:col-span-2", i === 4 && "sm:col-span-2 lg:col-span-2")}
             >
               <WorkCard project={p} large={i < 2} index={i} />

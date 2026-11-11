@@ -1,5 +1,5 @@
 /**
- * Seeds site settings and the "home" page sections from the placeholder content.
+ * Seeds site settings and the home / work / about / contact pages from the placeholder content.
  * Run: pnpm db:seed   (after `pnpm db:migrate`)
  *
  * The first admin account is NOT seeded. Create it with (email must be in ADMIN_EMAILS):
@@ -8,7 +8,7 @@
 import { config } from "dotenv";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { homeSections, site } from "../src/content/fallback";
+import { pageSections, site } from "../src/content/fallback";
 
 config({ path: [".env.local", ".env"], quiet: true });
 
@@ -42,27 +42,36 @@ async function main() {
     });
   }
 
-  const page = await db.page.upsert({
-    where: { slug: "home" },
-    update: {},
-    create: { slug: "home", title: "Home", status: "PUBLISHED", publishedAt: new Date() },
-  });
-
-  const existing = await db.section.count({ where: { pageId: page.id } });
-  if (existing === 0) {
+  // Pages: create any that are missing, with their placeholder sections already published.
+  let created = 0;
+  for (const [slug, sections] of Object.entries(pageSections)) {
+    const page = await db.page.upsert({
+      where: { slug },
+      update: {},
+      create: {
+        slug,
+        title: slug === "home" ? "Home" : slug[0]!.toUpperCase() + slug.slice(1),
+        status: "PUBLISHED",
+        publishedAt: new Date(),
+      },
+    });
+    if ((await db.section.count({ where: { pageId: page.id } })) > 0) continue;
     await db.section.createMany({
-      data: homeSections.map((s, order) => ({
+      data: sections.map((s, order) => ({
         pageId: page.id,
         type: s.type,
         order,
         visible: s.visible,
+        publishedOrder: order,
+        publishedVisible: s.visible,
         data: s.data,
         publishedData: s.data,
       })),
     });
+    created += sections.length;
   }
 
-  console.log(`Seeded site settings and ${homeSections.length} home sections.`);
+  console.log(`Seeded site settings; created ${created} sections across ${Object.keys(pageSections).length} pages.`);
 }
 
 main()

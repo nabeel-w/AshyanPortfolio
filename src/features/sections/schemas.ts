@@ -69,8 +69,50 @@ export const aboutSchema = z.object({
 export const contactCtaSchema = z.object({
   label: z.string().default("Let's talk"),
   headline: z.string().default("Have a project *in mind?*"),
-  email: z.string().email(),
+  email: z.email(),
   note: z.string().optional(),
+});
+
+/** Top of inner pages (About / Work / Contact): eyebrow, big serif title, intro. */
+export const pageHeaderSchema = z.object({
+  eyebrow: z.string().default("About"),
+  title: z.string().default("Your next story *starts in the edit.*"),
+  intro: z.string().default(""),
+});
+
+/** Portrait + key numbers + bio paragraphs (About page). Paragraphs are separated by blank lines. */
+export const bioSchema = z.object({
+  media: mediaRef,
+  stats: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+  body: z.string().default(""),
+});
+
+/** "What I do" service cards. */
+export const servicesSchema = z.object({
+  eyebrow: z.string().default("What I do"),
+  title: z.string().default("Beyond *the timeline*"),
+  items: z.array(z.object({ title: z.string(), description: z.string(), tag: z.string().default("") })).default([]),
+});
+
+/** Grouped client names (Brands / Agencies / Production companies). One name per line in the editor. */
+export const clientListSchema = z.object({
+  eyebrow: z.string().default("Trusted by"),
+  title: z.string().default("*Clients*"),
+  groups: z.array(z.object({ label: z.string(), names: z.array(z.string()).default([]) })).default([]),
+});
+
+/** Contact page: enquiry form + contact details sidebar. Email/WhatsApp/socials come from Site settings. */
+export const contactFormSchema = z.object({
+  projectTypes: z
+    .array(z.string())
+    .default(["Commercial", "Brand Film", "Fashion Film", "Music Video", "Documentary", "Other"]),
+  submitLabel: z.string().default("Send message"),
+  successMessage: z.string().default("Thank you — I'll get back to you within 24 hours."),
+  location: z.string().default(""),
+  availability: z.string().default("Currently available for selected projects worldwide."),
+  bookingUrl: z.string().default(""),
+  /** "Not sure I'm the right fit? Ask ChatGPT" card */
+  askAi: z.boolean().default(true),
 });
 
 export const sectionSchemas = {
@@ -80,6 +122,11 @@ export const sectionSchemas = {
   statement: statementSchema,
   about: aboutSchema,
   contactCta: contactCtaSchema,
+  pageHeader: pageHeaderSchema,
+  bio: bioSchema,
+  services: servicesSchema,
+  clientList: clientListSchema,
+  contactForm: contactFormSchema,
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;

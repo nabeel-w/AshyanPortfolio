@@ -219,6 +219,64 @@
   }
 }
 
+/*
+ * Scroll indicator — a minimal glowing red streak (public site only: pages with #main).
+ * Browsers with scroll-driven animations get the custom streak; others a thin red native bar.
+ */
+html:has(#main) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cinema-red) transparent;
+}
+html:has(#main)::-webkit-scrollbar {
+  width: 4px;
+}
+html:has(#main)::-webkit-scrollbar-thumb {
+  background: var(--cinema-red);
+  border-radius: 4px;
+}
+.scroll-streak {
+  display: none;
+}
+@supports (animation-timeline: scroll()) {
+  html:has(#main) {
+    scrollbar-width: none;
+  }
+  html:has(#main)::-webkit-scrollbar {
+    display: none;
+  }
+  .scroll-streak {
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 70;
+    width: 2px;
+    height: 100svh;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--hairline) 15% 85%, transparent);
+  }
+  .scroll-streak::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 2px;
+    height: 12svh;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, transparent, var(--cinema-red) 30%, var(--cinema-red-bright) 55%, var(--cinema-red) 75%, transparent);
+    box-shadow:
+      0 0 8px 1px rgb(227 32 45 / 0.75),
+      0 0 24px 3px rgb(193 18 31 / 0.35);
+    animation: scroll-streak linear both;
+    animation-timeline: scroll(root);
+  }
+}
+@keyframes scroll-streak {
+  to {
+    transform: translateY(88svh);
+  }
+}
+
 /* Header: transparent over the hero, frosted ink once scrolled (pure CSS scroll timeline). */
 .site-header::before {
   content: "";
@@ -300,5 +358,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Scroll-driven effects follow the user's own scrolling, so they stay on (duration must remain auto). */
+  .scroll-streak::after,
+  .site-header::before {
+    animation-duration: auto !important;
   }
 }

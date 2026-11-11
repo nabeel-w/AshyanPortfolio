@@ -249,8 +249,12 @@ model Section {
   page          Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
   /// Discriminator — must match a key in src/features/sections/registry.ts
   type          String
+  /// Draft position / visibility (editor)
   order         Int      @default(0)
   visible       Boolean  @default(true)
+  /// Live position / visibility — copied from order/visible on publish
+  publishedOrder   Int?
+  publishedVisible Boolean @default(false)
   /// Draft props (validated by the section's zod schema)
   data          Json
   /// Live props — null until first publish
@@ -258,6 +262,7 @@ model Section {
   updatedAt     DateTime @updatedAt
 
   @@index([pageId, order])
+  @@index([pageId, publishedVisible, publishedOrder])
 }
 
 /// Snapshot of a page's sections on every publish — enables one-click rollback

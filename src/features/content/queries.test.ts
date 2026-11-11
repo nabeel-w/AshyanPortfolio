@@ -1,6 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { homeSections, site as fallbackSite } from "@/content/fallback";
+import { homeSections, pageSections, site as fallbackSite } from "@/content/fallback";
 
 const db = vi.hoisted(() => ({
   siteSettings: { findUnique: vi.fn() },
@@ -81,9 +81,15 @@ describe("getPublishedPage", () => {
     expect(await getPublishedPage("home")).toBe(homeSections);
   });
 
-  it("returns an empty list for other unpublished pages", async () => {
+  it("falls back to placeholder sections for the other known pages", async () => {
     db.page.findFirst.mockResolvedValue(null);
-    expect(await getPublishedPage("about")).toEqual([]);
+    expect((await getPublishedPage("about")).map((s) => s.type)).toEqual(pageSections.about.map((s) => s.type));
+    expect((await getPublishedPage("contact"))[1]!.type).toBe("contactForm");
+  });
+
+  it("returns an empty list for unknown pages", async () => {
+    db.page.findFirst.mockResolvedValue(null);
+    expect(await getPublishedPage("press")).toEqual([]);
   });
 
   it("only queries published pages and visible sections, in order", async () => {
@@ -91,7 +97,7 @@ describe("getPublishedPage", () => {
     await getPublishedPage("home");
     expect(db.page.findFirst).toHaveBeenCalledWith({
       where: { slug: "home", status: "PUBLISHED" },
-      include: { sections: { where: { visible: true }, orderBy: { order: "asc" } } },
+      include: { sections: { where: { publishedVisible: true }, orderBy: { publishedOrder: "asc" } } },
     });
     expect(cacheTag).toHaveBeenCalledWith("page:home", "projects", "clients");
   });

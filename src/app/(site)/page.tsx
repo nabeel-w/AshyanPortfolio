@@ -1,8 +1,6 @@
-import { getPublishedPage } from "@/features/content/queries";
-import { SectionRenderer } from "@/features/sections/registry";
+import { PublishedPage } from "@/features/content/published-page";
 
-// Cached + tagged "page:home" — prerendered, refreshed only when the page is published.
-export default async function HomePage() {
-  const sections = await getPublishedPage("home");
-  return <SectionRenderer sections={sections} />;
+// Sections come from /admin/pages/home (publishedData only). Cached + tagged "page:home".
+export default function HomePage() {
+  return <PublishedPage slug="home" />;
 }

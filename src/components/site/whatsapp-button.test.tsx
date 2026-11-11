@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { WhatsAppButton, whatsappHref } from "./whatsapp-button";
+import { whatsappHref } from "@/lib/whatsapp";
+import { WhatsAppButton } from "./whatsapp-button";
 
 describe("whatsappHref", () => {
   it("keeps digits only and encodes the prefilled message", () => {

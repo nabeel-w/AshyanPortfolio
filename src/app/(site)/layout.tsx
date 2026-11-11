@@ -19,6 +19,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
       <main id="main">{children}</main>
       <SiteFooter />
       <BladeCursor />
+      <div className="scroll-streak" aria-hidden />
       {site.whatsapp ? <WhatsAppButton phone={site.whatsapp} message={site.whatsappMessage} /> : null}
       <JsonLd data={personJsonLd(site)} />
       <JsonLd data={websiteJsonLd(site)} />

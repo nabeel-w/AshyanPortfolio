@@ -4,6 +4,15 @@ import { createElement, type ImgHTMLAttributes } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { mockMatchMedia } from "./dom-utils";
 
+// Same minimal env as unit tests, for components that (indirectly) import server modules.
+process.env.DATABASE_URL ??= "postgresql://user:pass@localhost:5432/test";
+process.env.BETTER_AUTH_SECRET ??= "test-secret-test-secret-test-secret-1234";
+process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
+process.env.NEXT_PUBLIC_SITE_URL ??= "http://localhost:3000";
+
+// Server Actions are tested in the unit project; components get an inert stub.
+vi.mock("@/features/contact/actions", () => ({ submitContact: vi.fn(async () => ({ status: "idle" })) }));
+
 afterEach(() => cleanup());
 beforeEach(() => mockMatchMedia((q) => q.includes("pointer: fine")));
 
