@@ -1,14 +1,20 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { recordServerEvent } from "@/features/analytics/ingest";
 import { db } from "@/lib/db";
+import { notifyEnquiry } from "./notify";
 
 export type ContactState =
   | { status: "idle" }
   | { status: "success" }
-  | { status: "error"; message: string; fieldErrors?: Partial<Record<"name" | "email" | "message", string>> };
+  | {
+      status: "error";
+      message: string;
+      fieldErrors?: Partial<Record<"name" | "email" | "message", string>>;
+    };
 
 const schema = z.object({
   name: z.string().trim().min(2, "Please tell me your name").max(120),
@@ -46,7 +52,10 @@ export async function submitContact(_prev: ContactState, form: FormData): Promis
     where: { email, createdAt: { gte: new Date(Date.now() - RATE_LIMIT.windowMs) } },
   });
   if (recent >= RATE_LIMIT.max) {
-    return { status: "error", message: "You've sent a few messages already — I'll be in touch soon." };
+    return {
+      status: "error",
+      message: "You've sent a few messages already — I'll be in touch soon.",
+    };
   }
 
   const h = await headers();
@@ -63,6 +72,7 @@ export async function submitContact(_prev: ContactState, form: FormData): Promis
     },
   });
   await recordServerEvent({ type: "CONTACT_SUBMIT", path: path ?? "/contact" }, h);
-  // TODO(#13): email notification once a mail provider is chosen.
+  // Email ourselves through the linked Gmail account, after the response so the visitor never waits on it.
+  after(() => notifyEnquiry({ name, email, company, projectType, message, source: path }));
   return { status: "success" };
 }

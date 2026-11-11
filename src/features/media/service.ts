@@ -15,21 +15,51 @@ import { expectOk, kindFromMime, makeKey, maxBytes } from "./util";
  */
 
 export type UploadRequest = { filename: string; mimeType: string; bytes: number };
-export type UploadTicket = { assetId: string; kind: MediaKind; provider: string; upload: UploadInstruction };
+export type UploadTicket = {
+  assetId: string;
+  kind: MediaKind;
+  provider: string;
+  upload: UploadInstruction;
+};
 
-export async function createUpload({ filename, mimeType, bytes }: UploadRequest): Promise<UploadTicket> {
+/** Same type + size rules for every way a file gets in (browser upload, Drive import). */
+export function validateUpload(mimeType: string, bytes: number): MediaKind {
   const kind = kindFromMime(mimeType);
   if (!kind) throw new Error(`Unsupported file type: ${mimeType || "unknown"}`);
   if (bytes <= 0 || bytes > maxBytes(kind)) {
-    throw new Error(`${kind.toLowerCase()} files must be under ${Math.round(maxBytes(kind) / 1024 / 1024)} MB`);
+    throw new Error(
+      `${kind.toLowerCase()} files must be under ${Math.round(maxBytes(kind) / 1024 / 1024)} MB`,
+    );
   }
+  return kind;
+}
 
+export async function createUpload({
+  filename,
+  mimeType,
+  bytes,
+}: UploadRequest): Promise<UploadTicket> {
+  const kind = validateUpload(mimeType, bytes);
   const provider = providerFor(kind);
   const key = makeKey(kind, filename);
-  const { providerKey, upload } = await provider.createUpload({ key, filename, mimeType, bytes, kind });
+  const { providerKey, upload } = await provider.createUpload({
+    key,
+    filename,
+    mimeType,
+    bytes,
+    kind,
+  });
 
   const asset = await db.asset.create({
-    data: { kind, provider: provider.id, providerKey, status: "UPLOADING", filename, mimeType, bytes },
+    data: {
+      kind,
+      provider: provider.id,
+      providerKey,
+      status: "UPLOADING",
+      filename,
+      mimeType,
+      bytes,
+    },
   });
   return { assetId: asset.id, kind, provider: provider.id, upload };
 }
@@ -56,7 +86,7 @@ function toUpdate(result: ProviderResult): Prisma.AssetUpdateInput {
     duration: result.duration,
     width: result.width,
     height: result.height,
-    bytes: result.bytes,
+    bytes: result.bytes === undefined ? undefined : BigInt(result.bytes),
     meta: result.meta as Prisma.InputJsonValue | undefined,
   };
 }
@@ -66,7 +96,8 @@ export async function completeUpload(assetId: string) {
   const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
   const provider = getProvider(asset.provider);
   const result = await provider.finalize(asset.providerKey, asset.kind);
-  const image = asset.kind === "IMAGE" ? await enrichImage(provider, asset.providerKey, result) : {};
+  const image =
+    asset.kind === "IMAGE" ? await enrichImage(provider, asset.providerKey, result) : {};
   return db.asset.update({ where: { id: assetId }, data: { ...toUpdate(result), ...image } });
 }
 
@@ -87,13 +118,29 @@ export async function applyWebhook(providerId: string, request: Request) {
  * Server-side upload of an in-memory file through the same provider pipeline the browser uses
  * (seeding, imports). Streaming video may come back PROCESSING — poll `completeUpload` or rely on the webhook.
  */
-export async function ingest(file: Buffer, meta: { filename: string; mimeType: string; alt?: string }) {
-  const ticket = await createUpload({ filename: meta.filename, mimeType: meta.mimeType, bytes: file.length });
+export async function ingest(
+  file: Buffer,
+  meta: { filename: string; mimeType: string; alt?: string },
+) {
+  const ticket = await createUpload({
+    filename: meta.filename,
+    mimeType: meta.mimeType,
+    bytes: file.length,
+  });
   const body = new Uint8Array(file);
   const { upload } = ticket;
   if (upload.strategy === "put") {
-    const url = upload.url.startsWith("/") ? `${process.env.NEXT_PUBLIC_SITE_URL}${upload.url}` : upload.url;
-    await expectOk(await fetch(url, { method: "PUT", body, headers: { "Content-Type": meta.mimeType, ...upload.headers } }), "ingest PUT");
+    const url = upload.url.startsWith("/")
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}${upload.url}`
+      : upload.url;
+    await expectOk(
+      await fetch(url, {
+        method: "PUT",
+        body,
+        headers: { "Content-Type": meta.mimeType, ...upload.headers },
+      }),
+      "ingest PUT",
+    );
   } else if (upload.strategy === "form-post") {
     const form = new FormData();
     form.append(upload.fieldName, new Blob([body], { type: meta.mimeType }), meta.filename);
@@ -112,7 +159,26 @@ export async function ingest(file: Buffer, meta: { filename: string; mimeType: s
 
 /** Remove from the provider first, then the DB row (relations are SetNull / Cascade in the schema). */
 export async function deleteAsset(assetId: string) {
-  const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
-  await getProvider(asset.provider).delete(asset.providerKey);
+  const asset = await db.asset.findUniqueOrThrow({
+    where: { id: assetId },
+    include: { import: true },
+  });
+  const provider = getProvider(asset.provider);
+  // A half-finished server import holds a multipart upload / session at the provider: drop it too.
+  if (asset.import && asset.import.status !== "DONE") {
+    await provider.importer
+      ?.abort?.({
+        providerKey: asset.providerKey,
+        state: (asset.import.state ?? {}) as Record<string, unknown>,
+        total: Number(asset.import.bytesTotal),
+        mimeType: asset.mimeType,
+        filename: asset.filename,
+      })
+      .catch((e) => console.warn(`[media] aborting import of ${assetId} failed:`, e));
+  }
+  await provider.delete(asset.providerKey).catch((e) => {
+    // Nothing was ever stored for an import that never completed.
+    if (!asset.import || asset.import.status === "DONE") throw e;
+  });
   await db.asset.delete({ where: { id: assetId } });
 }

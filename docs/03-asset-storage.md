@@ -40,10 +40,13 @@ features/media/
 ├── service.ts          createUpload → completeUpload → applyWebhook / deleteAsset
 ├── actions.ts          admin Server Actions (requireAdmin + cache invalidation)
 ├── client/upload.ts    uploadFile(file, { onProgress }) for the browser
+├── import.ts           server-side imports (Google Drive → provider), chunked + resumable
+├── mime.ts             accepted MIME types per kind (client-safe)
 ├── image-meta.ts       sharp: width/height, blurDataUrl, dominantColor
 └── util.ts             mime → kind, keys, size limits, HMAC helpers
 app/api/media/local/[...key]   dev upload receiver (signed + expiring)
 app/api/media/webhooks/[id]    provider webhooks (signature-verified)
+app/api/media/import           runs an import in its own invocation (signed, self-chaining)
 ```
 
 **Choosing providers is env-only.** Set `MEDIA_VIDEO_PROVIDER`, `MEDIA_IMAGE_PROVIDER` and optionally `MEDIA_FILE_PROVIDER` (PDF/audio, defaults to the image provider), fill that provider's block in `.env.local`, then run:
@@ -71,6 +74,7 @@ With nothing set, development uses `local` (no accounts needed). Production refu
    - `createUpload({ key, mimeType, bytes, kind })` returns `{ providerKey, upload }`, using one of the `UploadInstruction` strategies (add a new strategy to `client/upload.ts` only if the provider needs one, e.g. tus)
    - `finalize(providerKey)` returns `ProviderResult`; `delete(providerKey)`
    - optional: `read` (image analysis), `webhook` (verify + parse), `check` (credential ping)
+   - optional: `importer` (`begin` / `part` / `complete`, plus `offset` and `abort`) so it can receive server-side imports from Google Drive (see "Import sources")
 2. Add it to the list in `providers/index.ts` and to the `mediaProvider` enum in `src/lib/env.ts`.
 3. Add its env block to `.env.example`, and its CDN host to `images.remotePatterns` in `next.config.ts`.
 4. `pnpm media:check`, then upload a test file from the admin.
@@ -88,6 +92,82 @@ Candidates already sketched in docs/07: Bunny Stream (tus uploads with signed he
 - **Mux**: webhook URL `<site>/api/media/webhooks/mux`; `MUX_VIDEO_QUALITY=basic` keeps encoding free (docs/07). Direct uploads PUT the whole file; switch to Mux UpChunk if masters exceed a few GB.
 - **Cloudflare Stream**: Direct Creator Uploads accept files up to 200 MB; larger needs a tus strategy.
 - **Vercel Blob**: public store; tokens are scoped to one pathname, content type and size for 15 minutes.
+
+## Import sources (Google Drive) and the Upload dialog
+
+Ashyan's masters usually live in Google Drive, so the admin can add media from two places through one **Upload dialog** (`components/admin/upload/`), opened from Media → **Upload** and from every media picker ("Upload new"):
+
+| Tab | How the bytes move |
+|---|---|
+| **This device** | Browser → provider directly (the pipeline above). |
+| **Google Drive** | Google Picker → our server copies the file **server to server**, Drive → provider, in 16 MiB chunks. Nothing passes through the admin's browser, and the dialog can be closed while it runs. |
+
+The queue under the tabs shows every item with its source, progress, status and a retry button. It belongs to the page rather than the dialog (`useUploadQueue`), so closing the dialog doesn't stop anything. The Media library shows imports as tiles with a progress bar (`Asset.status = UPLOADING` + an `AssetImport` row). On a phone the dialog is a full-screen sheet.
+
+YouTube is out of scope (decided 2026-11-11).
+
+### Connecting Google (link-only)
+
+Google is a **linked service, never a way in** (`src/lib/auth.ts`):
+
+- `disabledPaths: ["/sign-in/social", "/sign-in/oauth2"]` removes the only routes that could turn a Google identity into a session. The provider also has `disableSignUp` and `disableIdTokenSignIn`, and `accountLinking.disableImplicitLinking` is on.
+- A signed-in admin links Google with `authClient.linkSocial({ provider: "google", scopes: [...] })` (`features/google/client.ts → connectGoogle`). This runs in a **popup** so unsaved work survives. Google's pages cut `window.opener`, so the landing page `/connected` reports back over a `BroadcastChannel`.
+- `accessType: "offline"` + `prompt: "consent"` → Google always returns a refresh token. Tokens are stored **encrypted** (`account.encryptOAuthTokens`) in Better Auth's `account` table (no tables of our own). `auth.api.getAccessToken({ body: { accountId, userId } })` refreshes them.
+- **One Google account, several features.** Each feature asks for its own scope (incremental consent); Better Auth merges the scopes when the same account is linked again. The granted scopes on the `account` row decide what works:
+
+  | Feature | Scope | Google classification |
+  |---|---|---|
+  | Drive import | `https://www.googleapis.com/auth/drive.file` | non-sensitive: only files picked in the Picker |
+  | Gmail notifications (#13) | `https://www.googleapis.com/auth/gmail.send` | sensitive (not restricted): send-only, can't read mail |
+
+- `allowDifferentEmails` is on, so the Drive/Gmail account may differ from the admin login email. That's safe because a linked Google account can't sign in.
+- **Disconnect** revokes the grant at `oauth2.googleapis.com/revoke` (all scopes at once) and deletes the link. Both Media → Upload → Google Drive and Settings → Connected services offer it.
+
+### Drive import pipeline (`features/media/import.ts`)
+
+1. **Choose from Drive** → `drivePickerAction()` returns a short-lived access token + the Picker API key + project number → the Google Picker (`apis.google.com/js/api.js`, loaded only on click). Files only, multi-select, My Drive + shared drives, filtered to the accepted MIME types (`features/media/mime.ts`). The Upload dialog hides itself while the Picker is up, because a modal dialog underneath would swallow its clicks.
+2. `importFromDriveAction(fileIds)` (admin only) reads each file's metadata (`files.get?fields=name,mimeType,size,md5Checksum`) and applies the **same type/size rules** as device uploads (`validateUpload`). The kind's provider then starts a server upload session (`importer.begin`), and the action creates `Asset` (`UPLOADING`) + `AssetImport` (`RUNNING`).
+3. `kickImport` POSTs to `/api/media/import` (HMAC-signed, 5-minute token, `maxDuration = 300`), which answers 202 and works in `after()`:
+   - Each chunk: Drive `GET ?alt=media` with `Range` → `importer.part()` → save `bytesDone` + provider state. A failed chunk retries in place (3 tries, backoff).
+   - After ~230 s the run stops taking new chunks and kicks a fresh invocation, so files of any size work.
+   - A failed run is retried from the last saved chunk (up to 5 attempts). Permanent errors (Drive quota, permission, file gone, Google access revoked) fail at once with a readable message and a **Retry** button.
+   - A 2-minute **lease** (`AssetImport.leaseUntil`, taken atomically) ensures one runner per file. If a function dies, the lease expires and the admin's progress polling (`importProgressAction`) kicks the import again.
+4. Last chunk → `importer.complete()` → the normal `completeUpload()` → image analysis / Mux webhook / cache invalidation, exactly as for browser uploads.
+
+Each provider owns its server-side write through the optional `StorageProvider.importer`:
+
+| Provider | Protocol | Resume |
+|---|---|---|
+| `mux` | Direct Upload URL, `PUT` with `Content-Range` (the UpChunk protocol; 308 = continue) | `PUT bytes */total` → `Range` |
+| `s3` (R2/S3/B2) | Multipart upload, one part per chunk | parts are idempotent by number |
+| `vercel-blob` | `createMultipartUpload` / `uploadPart` / `completeMultipartUpload` | parts are idempotent by number |
+| `cloudflare-stream` | tus (`POST` → `PATCH` at `Upload-Offset`) | `HEAD` → `Upload-Offset` |
+| `local` (dev) | positional writes into `public/uploads` | idempotent |
+
+`Asset.bytes` and `AssetImport.bytes*` are `BigInt`, since `Int` overflows at 2 GiB.
+
+**Watch-outs:** `drive.file` covers the picked *files* only (picking a folder grants nothing, so folders can't be selected). Google-native Docs/Sheets/Slides have no binary content and are rejected. Very large or popular files can hit Drive's `downloadQuotaExceeded`, which shows as an error with Retry. On Vercel preview deployments with Deployment Protection, set `VERCEL_AUTOMATION_BYPASS_SECRET` so import runs can call their own route.
+
+### Gmail notifications (#13)
+
+`features/google/gmail.ts` sends through the Gmail API (`users.me.messages.send`, a raw RFC 5322 message with header-injection-safe headers and RFC 2047 subjects) from the linked mailbox. `submitContact` saves the enquiry, then in `after()` emails **the connected mailbox itself** with `Reply-To` set to the visitor (`features/contact/notify.ts`). Failures are logged and never affect the visitor, since the enquiry is already in Admin → Inbox. Connect, test and disconnect in **Settings → Connected services**.
+
+### Google Cloud Console setup (one-time, owner's Google account)
+
+1. **Project**: create one (e.g. `ashyan-portfolio`) at console.cloud.google.com and note the **project number** (IAM & Admin → Settings).
+2. **Enable APIs** (APIs & Services → Library): **Google Drive API**, **Google Picker API**, **Gmail API**.
+3. **OAuth consent screen** (Google Auth Platform):
+   - Branding: app name "Ashyan Zafar Admin", support email, the site domain under *Authorized domains*, privacy-policy and home-page URLs.
+   - Audience: *External*.
+   - Data access: `openid`, `email`, `profile`, `.../auth/drive.file` (non-sensitive) and `.../auth/gmail.send` (**sensitive**).
+   - ⚠️ While the app is in **Testing**, refresh tokens expire after **7 days** and only listed test users can connect. Add the admin's Google account as a test user for local work, then **Publish app → In production** before launch so the connection doesn't drop every week.
+   - Because `gmail.send` is sensitive, a production app that isn't verified shows Google's "unverified app" screen (Advanced → continue) and is capped at 100 users. That's fine for an admin-only app. To remove the screen, submit for verification (brand + scope justification + a short demo video; no security assessment, because the scope isn't *restricted*).
+4. **OAuth client** (Credentials → Create credentials → OAuth client ID → *Web application*):
+   - Authorized JavaScript origins: `http://localhost:3000`, `https://<prod domain>`.
+   - Authorized redirect URIs: `http://localhost:3000/api/auth/callback/google`, `https://<prod domain>/api/auth/callback/google`.
+5. **API key for the Picker** (Credentials → API key): restrict it to the *Google Picker API* and to HTTP referrers `http://localhost:3000/*`, `https://<prod domain>/*` **and `https://docs.google.com/*`** (the Picker runs in an iframe there; without it you get "API developer key is invalid").
+6. **Env** (`.env.local` and the Vercel project): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY`, `NEXT_PUBLIC_GOOGLE_PROJECT_NUMBER`. All optional: when missing, the Drive tab and Settings say "not configured".
+7. `pnpm media:check` prints a **Google** block: missing vars, a live check of the OAuth client, the key/project-number format, and which linked accounts grant Drive and Gmail.
 
 ## Delivery rules (how "instant" stays instant)
 

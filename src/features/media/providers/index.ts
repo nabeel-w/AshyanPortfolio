@@ -10,7 +10,10 @@ export const providers: readonly StorageProvider[] = [local, s3, vercelBlob, mux
 
 export function getProvider(id: string): StorageProvider {
   const p = providers.find((x) => x.id === id);
-  if (!p) throw new MediaConfigError(`Unknown media provider "${id}". Known: ${providers.map((x) => x.id).join(", ")}`);
+  if (!p)
+    throw new MediaConfigError(
+      `Unknown media provider "${id}". Known: ${providers.map((x) => x.id).join(", ")}`,
+    );
   return p;
 }
 
@@ -44,11 +47,15 @@ export function providerIdFor(kind: MediaKind): string {
 export function providerFor(kind: MediaKind): StorageProvider {
   const p = getProvider(providerIdFor(kind));
   if (!p.kinds.includes(kind)) {
-    throw new MediaConfigError(`Provider "${p.id}" can't store ${kind} files (it handles ${p.kinds.join(", ")}).`);
+    throw new MediaConfigError(
+      `Provider "${p.id}" can't store ${kind} files (it handles ${p.kinds.join(", ")}).`,
+    );
   }
   const missing = missingEnv(p);
   if (missing.length) {
-    throw new MediaConfigError(`Provider "${p.id}" is missing env: ${missing.join(", ")}. ${p.setup}`);
+    throw new MediaConfigError(
+      `Provider "${p.id}" is missing env: ${missing.join(", ")}. ${p.setup}`,
+    );
   }
   return p;
 }

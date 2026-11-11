@@ -43,6 +43,53 @@ export type CreateUploadInput = {
 
 export type WebhookUpdate = { providerKey: string; result: ProviderResult };
 
+/**
+ * Server-side imports (Google Drive → provider) move a file in fixed-size chunks so a multi-GB master
+ * never sits in memory or in a request body, and a failed chunk retries without starting over.
+ * 16 MiB: a multiple of 256 KiB (Mux/GCS, tus) and above the 5 MiB multipart minimum (S3, R2, Blob).
+ */
+export const IMPORT_CHUNK_BYTES = 16 * 1024 * 1024;
+
+/** Provider-side progress kept between chunks (upload id, part etags, session URL…). Must be JSON. */
+export type ImportState = Record<string, unknown>;
+
+export type ImportContext = {
+  providerKey: string;
+  state: ImportState;
+  /** Total file size in bytes */
+  total: number;
+  mimeType: string;
+  filename: string;
+};
+
+export type ImportPart = ImportContext & {
+  /** Byte offset of this chunk in the file */
+  offset: number;
+  /** 1-based, = offset / IMPORT_CHUNK_BYTES + 1 (multipart part number) */
+  partNumber: number;
+  last: boolean;
+};
+
+/** How a provider receives a file from our server, chunk by chunk. */
+export interface ProviderImporter {
+  /** Start an upload session; the providerKey is stored on the Asset like a browser upload's. */
+  begin(input: CreateUploadInput): Promise<{ providerKey: string; state: ImportState }>;
+  /**
+   * Write one chunk. Must be safe to repeat (retries). Returns updated state and, for protocols where
+   * the provider may keep fewer bytes than sent (resumable PUT, tus), the offset to continue from.
+   */
+  part(
+    part: ImportPart,
+    bytes: Uint8Array<ArrayBuffer>,
+  ): Promise<{ state?: ImportState; nextOffset?: number }>;
+  /** Bytes the provider really holds, asked when a crashed import resumes. Omit when parts are idempotent by number. */
+  offset?(ctx: ImportContext): Promise<number>;
+  /** All bytes written: assemble the file (multipart complete). Then the normal finalize() runs. */
+  complete(ctx: ImportContext): Promise<void>;
+  /** Drop a half-finished upload (asset deleted or import failed for good). */
+  abort?(ctx: ImportContext): Promise<void>;
+}
+
 export interface StorageProvider {
   /** Stored in Asset.provider. Never rename once assets exist. */
   readonly id: string;
@@ -55,7 +102,9 @@ export interface StorageProvider {
   /** One-line setup hint + docs link, shown when env is missing. */
   readonly setup: string;
 
-  createUpload(input: CreateUploadInput): Promise<{ providerKey: string; upload: UploadInstruction }>;
+  createUpload(
+    input: CreateUploadInput,
+  ): Promise<{ providerKey: string; upload: UploadInstruction }>;
   /** Called after the browser finishes uploading; returns READY or PROCESSING (transcoding). */
   finalize(providerKey: string, kind: MediaKind): Promise<ProviderResult>;
   delete(providerKey: string): Promise<void>;
@@ -65,8 +114,15 @@ export interface StorageProvider {
   webhook?(request: Request): Promise<WebhookUpdate | null>;
   /** Cheap authenticated call proving the credentials work. Returns a short status line. */
   check?(): Promise<string>;
+  /** Server-to-server chunked writes, for imports (Google Drive). Providers without one can't be import targets. */
+  importer?: ProviderImporter;
 }
 
 export class MediaConfigError extends Error {
   override name = "MediaConfigError";
+}
+
+/** An import failure that retrying won't fix (quota, permission, file gone). Shown to the admin with a Retry button. */
+export class PermanentImportError extends Error {
+  override name = "PermanentImportError";
 }

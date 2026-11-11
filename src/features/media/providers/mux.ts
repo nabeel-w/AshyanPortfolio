@@ -12,13 +12,42 @@ import { expectOk, freshTimestamp, hmac, parseSigHeader, safeEqualHex } from "..
 const API = "https://api.mux.com/video/v1";
 
 function headers() {
-  const auth = Buffer.from(`${process.env.MUX_TOKEN_ID}:${process.env.MUX_TOKEN_SECRET}`).toString("base64");
+  const auth = Buffer.from(`${process.env.MUX_TOKEN_ID}:${process.env.MUX_TOKEN_SECRET}`).toString(
+    "base64",
+  );
   return { Authorization: `Basic ${auth}`, "Content-Type": "application/json" };
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await expectOk(await fetch(`${API}${path}`, { ...init, headers: headers() }), `Mux ${path}`);
+  const res = await expectOk(
+    await fetch(`${API}${path}`, { ...init, headers: headers() }),
+    `Mux ${path}`,
+  );
   return res.status === 204 ? (undefined as T) : ((await res.json()) as { data: T }).data;
+}
+
+/** A Direct Upload: a resumable (GCS-style) session URL that accepts the whole file or Content-Range chunks. */
+function directUpload(timeoutSec?: number) {
+  return api<{ id: string; url: string }>("/uploads", {
+    method: "POST",
+    body: JSON.stringify({
+      cors_origin: process.env.NEXT_PUBLIC_SITE_URL ?? "*",
+      // Default is 1 hour; server imports of big masters can take longer.
+      ...(timeoutSec ? { timeout: timeoutSec } : {}),
+      new_asset_settings: {
+        playback_policies: ["public"],
+        video_quality: process.env.MUX_VIDEO_QUALITY ?? "basic",
+        // Small MP4 for hover loops / social embeds.
+        static_renditions: [{ resolution: "highest" }],
+      },
+    }),
+  });
+}
+
+/** "bytes=0-1048575" → 1048576 (next byte to send). No header = nothing stored yet. */
+export function nextByteFromRange(range: string | null): number {
+  const end = range?.match(/-(\d+)\s*$/)?.[1];
+  return end === undefined ? 0 : Number(end) + 1;
 }
 
 type MuxAsset = {
@@ -34,10 +63,14 @@ type MuxAsset = {
 
 function fromAsset(asset: MuxAsset): ProviderResult {
   if (asset.status === "errored") {
-    return { status: "ERRORED", meta: { assetId: asset.id, error: asset.errors?.messages?.join("; ") } };
+    return {
+      status: "ERRORED",
+      meta: { assetId: asset.id, error: asset.errors?.messages?.join("; ") },
+    };
   }
   const playbackId = asset.playback_ids?.find((p) => p.policy === "public")?.id;
-  if (asset.status !== "ready" || !playbackId) return { status: "PROCESSING", meta: { assetId: asset.id } };
+  if (asset.status !== "ready" || !playbackId)
+    return { status: "PROCESSING", meta: { assetId: asset.id } };
   const [w, h] = (asset.aspect_ratio ?? "16:9").split(":").map(Number);
   return {
     status: "READY",
@@ -64,18 +97,7 @@ export const mux: StorageProvider = {
     "Mux dashboard → Settings → Access Tokens (Mux Video read+write) → MUX_TOKEN_ID/SECRET. Add a webhook to <site>/api/media/webhooks/mux and copy its signing secret to MUX_WEBHOOK_SECRET.",
 
   async createUpload() {
-    const upload = await api<{ id: string; url: string }>("/uploads", {
-      method: "POST",
-      body: JSON.stringify({
-        cors_origin: process.env.NEXT_PUBLIC_SITE_URL ?? "*",
-        new_asset_settings: {
-          playback_policies: ["public"],
-          video_quality: process.env.MUX_VIDEO_QUALITY ?? "basic",
-          // Small MP4 for hover loops / social embeds.
-          static_renditions: [{ resolution: "highest" }],
-        },
-      }),
-    });
+    const upload = await directUpload();
     return { providerKey: upload.id, upload: { strategy: "put", url: upload.url } };
   },
 
@@ -90,9 +112,12 @@ export const mux: StorageProvider = {
   },
 
   async delete(uploadId) {
-    const upload = await api<{ asset_id?: string; status: string }>(`/uploads/${uploadId}`).catch(() => null);
+    const upload = await api<{ asset_id?: string; status: string }>(`/uploads/${uploadId}`).catch(
+      () => null,
+    );
     if (upload?.asset_id) await api(`/assets/${upload.asset_id}`, { method: "DELETE" });
-    else if (upload?.status === "waiting") await api(`/uploads/${uploadId}/cancel`, { method: "PUT" });
+    else if (upload?.status === "waiting")
+      await api(`/uploads/${uploadId}/cancel`, { method: "PUT" });
   },
 
   async webhook(request) {
@@ -100,16 +125,56 @@ export const mux: StorageProvider = {
     if (!secret) throw new Error("MUX_WEBHOOK_SECRET is not set");
     const raw = await request.text();
     const sig = parseSigHeader(request.headers.get("mux-signature"));
-    if (!freshTimestamp(sig.t) || !sig.v1 || !safeEqualHex(hmac(secret, `${sig.t}.${raw}`), sig.v1)) {
+    if (
+      !freshTimestamp(sig.t) ||
+      !sig.v1 ||
+      !safeEqualHex(hmac(secret, `${sig.t}.${raw}`), sig.v1)
+    ) {
       throw new Error("Invalid Mux webhook signature");
     }
     const event = JSON.parse(raw) as { type: string; data: MuxAsset };
-    if (!["video.asset.ready", "video.asset.errored"].includes(event.type) || !event.data.upload_id) return null;
+    if (!["video.asset.ready", "video.asset.errored"].includes(event.type) || !event.data.upload_id)
+      return null;
     return { providerKey: event.data.upload_id, result: fromAsset(event.data) };
   },
 
   async check() {
     await api("/assets?limit=1");
     return "credentials valid";
+  },
+
+  // Chunked server upload into the same Direct Upload URL (the protocol Mux UpChunk uses):
+  // PUT with Content-Range; 308 = keep going (Range says what was stored), 200/201 = complete.
+  importer: {
+    async begin() {
+      const upload = await directUpload(24 * 60 * 60);
+      return { providerKey: upload.id, state: { url: upload.url } };
+    },
+    async offset({ state, total }) {
+      const res = await fetch(String(state.url), {
+        method: "PUT",
+        headers: { "Content-Range": `bytes */${total}` },
+      });
+      if (res.status === 308) return nextByteFromRange(res.headers.get("range"));
+      await expectOk(res, "Mux upload status");
+      return total;
+    },
+    async part({ state, offset, total, mimeType }, bytes) {
+      const end = offset + bytes.byteLength - 1;
+      const res = await fetch(String(state.url), {
+        method: "PUT",
+        headers: { "Content-Type": mimeType, "Content-Range": `bytes ${offset}-${end}/${total}` },
+        body: bytes,
+      });
+      if (res.status === 308) return { nextOffset: nextByteFromRange(res.headers.get("range")) };
+      await expectOk(res, "Mux chunk upload");
+      return { nextOffset: total };
+    },
+    async complete() {
+      // Mux creates the asset by itself once the last byte lands; finalize()/the webhook take it from there.
+    },
+    async abort({ providerKey }) {
+      await mux.delete(providerKey);
+    },
   },
 };

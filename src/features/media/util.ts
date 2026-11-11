@@ -1,20 +1,16 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { MediaKind } from "./types";
 
-const MIME_KIND: [RegExp, MediaKind][] = [
-  [/^image\/(jpeg|png|webp|avif|gif|svg\+xml)$/, "IMAGE"],
-  [/^video\/(mp4|quicktime|webm|x-matroska|x-m4v)$/, "VIDEO"],
-  [/^audio\/(mpeg|mp4|wav|x-wav|aac|ogg|flac)$/, "AUDIO"],
-  [/^application\/pdf$/, "DOCUMENT"],
-];
-
-export function kindFromMime(mimeType: string): MediaKind | null {
-  return MIME_KIND.find(([re]) => re.test(mimeType))?.[1] ?? null;
-}
+export { kindFromMime } from "./mime";
 
 /** Max upload size per kind in bytes. Override with MEDIA_MAX_<KIND>_MB. */
 export function maxBytes(kind: MediaKind): number {
-  const defaults: Record<MediaKind, number> = { IMAGE: 50, VIDEO: 10_000, AUDIO: 500, DOCUMENT: 50 };
+  const defaults: Record<MediaKind, number> = {
+    IMAGE: 50,
+    VIDEO: 10_000,
+    AUDIO: 500,
+    DOCUMENT: 50,
+  };
   const mb = Number(process.env[`MEDIA_MAX_${kind}_MB`] ?? defaults[kind]);
   return mb * 1024 * 1024;
 }
@@ -22,7 +18,13 @@ export function maxBytes(kind: MediaKind): number {
 /** "image/2026/11/hero-still-k3j2x9.webp" — readable, unique, URL-safe. */
 export function makeKey(kind: MediaKind, filename: string, now = new Date()): string {
   const dot = filename.lastIndexOf(".");
-  const ext = dot > 0 ? filename.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "") : "bin";
+  const ext =
+    dot > 0
+      ? filename
+          .slice(dot + 1)
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "")
+      : "bin";
   const base =
     (dot > 0 ? filename.slice(0, dot) : filename)
       .normalize("NFKD")

@@ -113,7 +113,8 @@ model Asset {
   url          String?
   filename     String
   mimeType     String
-  bytes        Int?
+  /// BigInt: video masters can exceed 2 GiB (Int would overflow)
+  bytes        BigInt?
   width        Int?
   height       Int?
   /// Seconds — video/audio only
@@ -134,9 +135,45 @@ model Asset {
   projectLoops    Project[] @relation("ProjectLoop")
   projectGallery  ProjectMedia[]
   clientLogos     Client[]
+  /// Present while/after a server-side import (Google Drive → provider)
+  import          AssetImport?
 
   @@unique([provider, providerKey])
   @@index([kind, status])
+}
+
+enum ImportStatus {
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Server-to-server import into a storage provider (Google Drive today), resumable chunk by chunk.
+/// The engine in src/features/media/import.ts holds a short lease while it works, so only one runner
+/// moves a file at a time and a crashed run is picked up again. See docs/03 "Import sources".
+model AssetImport {
+  id         String       @id @default(cuid())
+  assetId    String       @unique
+  asset      Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// "google-drive"
+  source     String
+  /// Drive file id
+  sourceId   String
+  /// Better Auth account row whose OAuth token reads the source
+  accountId  String
+  bytesTotal BigInt
+  bytesDone  BigInt       @default(0)
+  /// Provider-side upload state (multipart upload id + part etags, resumable session URL…)
+  state      Json         @default("{}")
+  status     ImportStatus @default(RUNNING)
+  error      String?
+  /// Failed runs in a row; the import gives up after a few
+  attempts   Int          @default(0)
+  leaseUntil DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([status, leaseUntil])
 }
 
 // ─────────────────────────────────────────────────────────────

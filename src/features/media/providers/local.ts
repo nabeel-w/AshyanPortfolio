@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { StorageProvider } from "../types";
 import { hmac } from "../util";
@@ -30,7 +30,9 @@ export function localPath(key: string): string {
 
 function assertDev() {
   if (process.env.NODE_ENV === "production") {
-    throw new Error('The "local" media provider is for development only. Configure a real provider for production.');
+    throw new Error(
+      'The "local" media provider is for development only. Configure a real provider for production.',
+    );
   }
 }
 
@@ -67,5 +69,29 @@ export const local: StorageProvider = {
     assertDev();
     await mkdir(LOCAL_ROOT, { recursive: true });
     return `writing to ${path.relative(process.cwd(), LOCAL_ROOT)}`;
+  },
+
+  // Server imports write each chunk at its offset (idempotent, so retries are safe).
+  importer: {
+    async begin({ key }) {
+      assertDev();
+      const file = localPath(key);
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, "");
+      return { providerKey: key, state: {} };
+    },
+    async part({ providerKey, offset }, bytes) {
+      const handle = await open(localPath(providerKey), "r+");
+      try {
+        await handle.write(bytes, 0, bytes.byteLength, offset);
+      } finally {
+        await handle.close();
+      }
+      return {};
+    },
+    async complete() {},
+    async abort({ providerKey }) {
+      await rm(localPath(providerKey), { force: true });
+    },
   },
 };

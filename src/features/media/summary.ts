@@ -1,4 +1,4 @@
-import type { Asset } from "@/generated/prisma/client";
+import type { Asset, AssetImport } from "@/generated/prisma/client";
 
 export type AssetSummary = {
   id: string;
@@ -15,10 +15,17 @@ export type AssetSummary = {
   duration: number | null;
   bytes: number | null;
   createdAt: string;
+  /** Server-side import progress (Google Drive), when the asset came in that way */
+  import: {
+    status: "RUNNING" | "DONE" | "FAILED";
+    bytesDone: number;
+    bytesTotal: number;
+    error: string | null;
+  } | null;
 };
 
 /** Serializable view of an Asset for admin UIs (pickers, library). */
-export function toAssetSummary(a: Asset): AssetSummary {
+export function toAssetSummary(a: Asset & { import?: AssetImport | null }): AssetSummary {
   return {
     id: a.id,
     kind: a.kind,
@@ -32,7 +39,15 @@ export function toAssetSummary(a: Asset): AssetSummary {
     blurDataUrl: a.blurDataUrl,
     playbackId: a.playbackId,
     duration: a.duration,
-    bytes: a.bytes,
+    bytes: a.bytes === null ? null : Number(a.bytes),
     createdAt: a.createdAt.toISOString(),
+    import: a.import
+      ? {
+          status: a.import.status,
+          bytesDone: Number(a.import.bytesDone),
+          bytesTotal: Number(a.import.bytesTotal),
+          error: a.import.error,
+        }
+      : null,
   };
 }

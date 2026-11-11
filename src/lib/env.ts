@@ -11,6 +11,8 @@ const mediaProvider = z.preprocess(
   z.enum(["local", "s3", "vercel-blob", "mux", "cloudflare-stream"]).optional(),
 );
 
+const optional = z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional());
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
@@ -24,7 +26,12 @@ const schema = z.object({
   ADMIN_EMAILS: z
     .string()
     .default("")
-    .transform((v) => v.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)),
+    .transform((v) =>
+      v
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean),
+    ),
 
   // Public site
   NEXT_PUBLIC_SITE_URL: z.url(),
@@ -39,6 +46,14 @@ const schema = z.object({
   MEDIA_IMAGE_PROVIDER: mediaProvider,
   MEDIA_VIDEO_PROVIDER: mediaProvider,
   MEDIA_FILE_PROVIDER: mediaProvider,
+
+  // Google (optional): link-only OAuth for Drive imports and Gmail notifications. docs/03 "Import sources".
+  GOOGLE_CLIENT_ID: optional,
+  GOOGLE_CLIENT_SECRET: optional,
+  /** Browser key restricted to the Picker API (public by design). */
+  NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: optional,
+  /** Cloud project number, the Picker's setAppId (needed for drive.file). */
+  NEXT_PUBLIC_GOOGLE_PROJECT_NUMBER: optional,
 });
 
 export const env = schema.parse(process.env);

@@ -13,7 +13,25 @@ vi.mock("./service", () => service);
 const invalidate = vi.hoisted(() => ({ assets: vi.fn(), projects: vi.fn(), clients: vi.fn() }));
 vi.mock("@/features/content/invalidate", () => ({ invalidate }));
 
-const { completeUploadAction, createUploadAction, deleteAssetAction } = await import("./actions");
+const imports = vi.hoisted(() => ({
+  createDriveImport: vi.fn(),
+  kickImport: vi.fn(),
+  importProgress: vi.fn(),
+  retryImport: vi.fn(),
+}));
+vi.mock("./import", () => imports);
+
+const googleAccountFor = vi.hoisted(() => vi.fn());
+vi.mock("@/features/google/accounts", () => ({ googleAccountFor }));
+
+const {
+  completeUploadAction,
+  createUploadAction,
+  deleteAssetAction,
+  importFromDriveAction,
+  importProgressAction,
+  retryImportAction,
+} = await import("./actions");
 
 const cuid = "cmwbj2o1m0001rovldp9zmq0k";
 
@@ -66,5 +84,65 @@ describe("media server actions", () => {
     expect(invalidate.assets).toHaveBeenCalled();
     expect(invalidate.projects).toHaveBeenCalled();
     expect(invalidate.clients).toHaveBeenCalled();
+  });
+});
+
+describe("Google Drive import actions", () => {
+  const admin = { user: { id: "u1" } };
+
+  it("refuse to run without an admin session", async () => {
+    requireAdmin.mockRejectedValue(new Error("NEXT_REDIRECT"));
+    await expect(importFromDriveAction(["driveFile0001"])).rejects.toThrow("NEXT_REDIRECT");
+    await expect(importProgressAction([cuid])).rejects.toThrow("NEXT_REDIRECT");
+    await expect(retryImportAction(cuid)).rejects.toThrow("NEXT_REDIRECT");
+    expect(imports.createDriveImport).not.toHaveBeenCalled();
+    expect(imports.retryImport).not.toHaveBeenCalled();
+  });
+
+  it("validate Drive file ids before calling Google", async () => {
+    requireAdmin.mockResolvedValue(admin);
+    await expect(importFromDriveAction([])).rejects.toThrow();
+    await expect(importFromDriveAction(["../../etc/passwd"])).rejects.toThrow();
+    await expect(
+      importFromDriveAction(
+        Array.from({ length: 51 }, (_, i) => `driveFile${String(i).padStart(4, "0")}`),
+      ),
+    ).rejects.toThrow();
+    expect(googleAccountFor).not.toHaveBeenCalled();
+  });
+
+  it("need a connected Drive account for this admin", async () => {
+    requireAdmin.mockResolvedValue(admin);
+    googleAccountFor.mockResolvedValue(null);
+    await expect(importFromDriveAction(["driveFile0001"])).rejects.toThrow(/Connect Google Drive/);
+    expect(googleAccountFor).toHaveBeenCalledWith("drive", "u1");
+  });
+
+  it("start one import per file, kick each, and report per-file errors", async () => {
+    requireAdmin.mockResolvedValue(admin);
+    googleAccountFor.mockResolvedValue({ id: "acc1" });
+    imports.createDriveImport
+      .mockResolvedValueOnce("asset1")
+      .mockRejectedValueOnce(new Error("Unsupported file type: application/zip"));
+    const results = await importFromDriveAction(["driveFile0001", "driveFile0002"]);
+    expect(results).toEqual([
+      { fileId: "driveFile0001", assetId: "asset1" },
+      { fileId: "driveFile0002", error: "Unsupported file type: application/zip" },
+    ]);
+    expect(imports.createDriveImport).toHaveBeenCalledWith("acc1", "driveFile0001");
+    expect(imports.kickImport).toHaveBeenCalledTimes(1);
+    expect(imports.kickImport).toHaveBeenCalledWith("asset1");
+    expect(invalidate.assets).toHaveBeenCalled();
+  });
+
+  it("progress refreshes the library once an import finishes", async () => {
+    requireAdmin.mockResolvedValue(admin);
+    imports.importProgress.mockResolvedValueOnce([{ assetId: cuid, status: "RUNNING" }]);
+    await importProgressAction([cuid]);
+    expect(invalidate.assets).not.toHaveBeenCalled();
+    imports.importProgress.mockResolvedValueOnce([{ assetId: cuid, status: "DONE" }]);
+    await importProgressAction([cuid]);
+    expect(invalidate.assets).toHaveBeenCalledTimes(1);
+    await expect(importProgressAction(["nope"])).rejects.toThrow();
   });
 });

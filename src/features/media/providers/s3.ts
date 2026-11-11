@@ -31,14 +31,26 @@ function cfg() {
     service: "s3",
     region: process.env.S3_REGION || "auto",
   });
-  return { endpoint, bucket, objectUrl, client, publicBase: process.env.S3_PUBLIC_URL!.replace(/\/$/, "") };
+  return {
+    endpoint,
+    bucket,
+    objectUrl,
+    client,
+    publicBase: process.env.S3_PUBLIC_URL!.replace(/\/$/, ""),
+  };
 }
 
 export const s3: StorageProvider = {
   id: "s3",
   label: "S3-compatible (R2 / S3 / B2 / MinIO)",
   kinds: ["IMAGE", "VIDEO", "AUDIO", "DOCUMENT"],
-  requiredEnv: ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"],
+  requiredEnv: [
+    "S3_ENDPOINT",
+    "S3_BUCKET",
+    "S3_ACCESS_KEY_ID",
+    "S3_SECRET_ACCESS_KEY",
+    "S3_PUBLIC_URL",
+  ],
   optionalEnv: ["S3_REGION", "S3_FORCE_PATH_STYLE"],
   setup:
     "Create a bucket + API token with read/write on it, add a CORS rule for PUT from your site, then set S3_* (R2: https://developers.cloudflare.com/r2/api/s3/tokens/).",
@@ -47,7 +59,9 @@ export const s3: StorageProvider = {
     const { client, objectUrl } = cfg();
     const url = new URL(objectUrl(key));
     url.searchParams.set("X-Amz-Expires", String(PRESIGN_TTL_SECONDS));
-    const signed = await client.sign(new Request(url, { method: "PUT" }), { aws: { signQuery: true } });
+    const signed = await client.sign(new Request(url, { method: "PUT" }), {
+      aws: { signQuery: true },
+    });
     return { providerKey: key, upload: { strategy: "put", url: signed.url } };
   },
 
@@ -56,7 +70,12 @@ export const s3: StorageProvider = {
     const res = await client.fetch(objectUrl(key), { method: "HEAD" });
     if (!res.ok) return { status: "ERRORED", meta: { error: `HEAD ${res.status}` } };
     const url = `${publicBase}/${key}`;
-    return { status: "READY", url, bytes: Number(res.headers.get("content-length")) || undefined, meta: { mp4: url } };
+    return {
+      status: "READY",
+      url,
+      bytes: Number(res.headers.get("content-length")) || undefined,
+      meta: { mp4: url },
+    };
   },
 
   async delete(key) {
@@ -77,4 +96,81 @@ export const s3: StorageProvider = {
     await expectOk(res, "S3 list");
     return `bucket "${bucket}" reachable`;
   },
+
+  // Server imports use S3 multipart: one part per chunk (all parts the same size except the last,
+  // which R2 requires). Re-sending a part number simply replaces it, so retries are safe.
+  importer: {
+    async begin({ key, mimeType }) {
+      const { client, objectUrl } = cfg();
+      const res = await expectOk(
+        await client.fetch(`${objectUrl(key)}?uploads`, {
+          method: "POST",
+          headers: { "Content-Type": mimeType },
+        }),
+        "S3 create multipart upload",
+      );
+      const uploadId = (await res.text()).match(/<UploadId>([^<]+)<\/UploadId>/)?.[1];
+      if (!uploadId) throw new Error("S3 create multipart upload: no UploadId in response");
+      return { providerKey: key, state: { uploadId, parts: [] } };
+    },
+    async part({ providerKey, state, partNumber }, bytes) {
+      const { client, objectUrl } = cfg();
+      const url = `${objectUrl(providerKey)}?partNumber=${partNumber}&uploadId=${encodeURIComponent(String(state.uploadId))}`;
+      const res = await expectOk(
+        await client.fetch(url, { method: "PUT", body: bytes }),
+        `S3 upload part ${partNumber}`,
+      );
+      const etag = res.headers.get("etag");
+      if (!etag)
+        throw new Error(
+          `S3 upload part ${partNumber}: no ETag (expose it in the bucket CORS/ACL?)`,
+        );
+      return { state: { ...state, parts: upsertPart(state.parts, { partNumber, etag }) } };
+    },
+    async complete({ providerKey, state }) {
+      const { client, objectUrl } = cfg();
+      const parts = [...(state.parts as Part[])].sort((a, b) => a.partNumber - b.partNumber);
+      const xml = `<CompleteMultipartUpload>${parts
+        .map(
+          (p) =>
+            `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${escapeXml(p.etag)}</ETag></Part>`,
+        )
+        .join("")}</CompleteMultipartUpload>`;
+      const url = `${objectUrl(providerKey)}?uploadId=${encodeURIComponent(String(state.uploadId))}`;
+      const res = await expectOk(
+        await client.fetch(url, { method: "POST", body: xml }),
+        "S3 complete multipart upload",
+      );
+      // S3 can answer 200 with an <Error> body when completion fails late.
+      const text = await res.text();
+      if (/<Error>/.test(text))
+        throw new Error(`S3 complete multipart upload failed: ${text.slice(0, 300)}`);
+    },
+    async abort({ providerKey, state }) {
+      const { client, objectUrl } = cfg();
+      if (!state.uploadId) return;
+      await client.fetch(
+        `${objectUrl(providerKey)}?uploadId=${encodeURIComponent(String(state.uploadId))}`,
+        { method: "DELETE" },
+      );
+    },
+  },
 };
+
+type Part = { partNumber: number; etag: string };
+
+/** Replace (or add) a part's etag; retries of the same part number overwrite it. */
+export function upsertPart(parts: unknown, part: Part): Part[] {
+  return [
+    ...((parts as Part[] | undefined) ?? []).filter((p) => p.partNumber !== part.partNumber),
+    part,
+  ];
+}
+
+function escapeXml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

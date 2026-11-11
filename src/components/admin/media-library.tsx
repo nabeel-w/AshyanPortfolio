@@ -1,113 +1,104 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { completeUploadAction, deleteAssetAction, listAssetsAction, updateAssetAction } from "@/features/media/actions";
-import { uploadFile } from "@/features/media/client/upload";
+import {
+  completeUploadAction,
+  deleteAssetAction,
+  importProgressAction,
+  listAssetsAction,
+  retryImportAction,
+  updateAssetAction,
+} from "@/features/media/actions";
 import { clockDuration } from "@/features/media/delivery";
 import type { AssetSummary } from "@/features/media/summary";
 import { cn } from "@/lib/utils";
 import { ConfirmButton } from "./confirm-button";
 import { assetThumb } from "./media-picker";
+import { UploadDialog } from "./upload/upload-dialog";
+import { useUploadQueue } from "./upload/use-upload-queue";
 
-type Upload = { name: string; progress: number; error?: string };
 const KINDS = ["ALL", "IMAGE", "VIDEO", "DOCUMENT"] as const;
 
-/** Media library: drag-and-drop uploads straight to the provider, grid, alt text, delete. */
-export function MediaLibrary({ initial }: { initial: AssetSummary[] }) {
+/** Media library: Add media (device / Google Drive), grid with live import progress, alt text, delete. */
+export function MediaLibrary({
+  initial,
+  openUpload = false,
+}: {
+  initial: AssetSummary[];
+  openUpload?: boolean;
+}) {
   const [assets, setAssets] = useState(initial);
-  const [uploads, setUploads] = useState<Upload[]>([]);
   const [filter, setFilter] = useState<(typeof KINDS)[number]>("ALL");
   const [selected, setSelected] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(openUpload);
   const [, startTransition] = useTransition();
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => startTransition(async () => setAssets(await listAssetsAction()));
+  const refresh = useCallback(
+    () => startTransition(async () => setAssets(await listAssetsAction())),
+    [],
+  );
+  const queue = useUploadQueue({ onChange: refresh });
 
-  // Streaming video is transcoded at the provider. Webhooks can't reach localhost, so poll while anything is processing.
+  // Streaming video is transcoded at the provider and Drive imports fill server-side.
+  // Webhooks can't reach localhost, so poll while anything is still moving.
   const processing = assets.filter((a) => a.status === "PROCESSING").map((a) => a.id);
+  const importing = assets.filter((a) => a.import?.status === "RUNNING").map((a) => a.id);
+  const moving = [...processing, ...importing].join(",");
   useEffect(() => {
-    if (!processing.length) return;
-    const t = setInterval(async () => {
-      for (const id of processing) await completeUploadAction(id).catch(() => null);
-      refresh();
-    }, 4000);
+    if (!moving) return;
+    const t = setInterval(
+      async () => {
+        if (importing.length) await importProgressAction(importing).catch(() => null);
+        for (const id of processing) await completeUploadAction(id).catch(() => null);
+        refresh();
+      },
+      importing.length ? 2500 : 4000,
+    );
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processing.join(",")]);
-
-  async function upload(files: FileList | File[]) {
-    for (const file of Array.from(files)) {
-      setUploads((u) => [...u, { name: file.name, progress: 0 }]);
-      const patch = (p: Partial<Upload>) => setUploads((u) => u.map((x) => (x.name === file.name ? { ...x, ...p } : x)));
-      try {
-        await uploadFile(file, { onProgress: (progress) => patch({ progress }) });
-        setUploads((u) => u.filter((x) => x.name !== file.name));
-        toast.success(`${file.name} uploaded`);
-      } catch (e) {
-        patch({ error: e instanceof Error ? e.message : "Upload failed" });
-      }
-      refresh();
-    }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-subscribe only when the moving set changes
+  }, [moving]);
 
   const shown = assets.filter((a) => filter === "ALL" || a.kind === filter);
   const current = assets.find((a) => a.id === selected) ?? null;
 
   return (
     <div className="space-y-6">
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          void upload(e.dataTransfer.files);
-        }}
-        className={cn(
-          "grid place-items-center rounded-md border border-dashed border-border px-6 py-10 text-center transition-colors",
-          dragging && "border-red bg-red/5",
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => setUploadOpen(true)}>Upload</Button>
+        {queue.active ? (
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="text-sm text-muted-foreground hover:text-ivory"
+          >
+            {queue.active} in progress…
+          </button>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            From this device or Google Drive. Images go to the image store, video to the video host.
+          </p>
         )}
-      >
-        <p className="font-serif text-2xl text-ivory">Drop stills, films or PDFs here</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Files go straight to storage (images → Vercel Blob, video → Mux). Videos take a minute to process.
-        </p>
-        <input ref={fileRef} type="file" multiple hidden accept="image/*,video/*,application/pdf" onChange={(e) => e.target.files && upload(e.target.files)} />
-        <Button className="mt-4" onClick={() => fileRef.current?.click()}>
-          Choose files
-        </Button>
-        {uploads.length ? (
-          <ul className="mt-6 w-full max-w-md space-y-2 text-left">
-            {uploads.map((u) => (
-              <li key={u.name} className="text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="truncate">{u.name}</span>
-                  <span className={u.error ? "text-red-bright" : "text-muted-foreground"}>{u.error ?? `${Math.round(u.progress * 100)}%`}</span>
-                </div>
-                <div className="mt-1 h-0.5 bg-graphite">
-                  <div className="h-full bg-red transition-[width]" style={{ width: `${u.progress * 100}%` }} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
+      <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} queue={queue} />
 
       <div className="flex flex-wrap gap-2">
         {KINDS.map((k) => (
-          <Button key={k} size="sm" variant={filter === k ? "default" : "outline"} onClick={() => setFilter(k)}>
+          <Button
+            key={k}
+            size="sm"
+            variant={filter === k ? "default" : "outline"}
+            onClick={() => setFilter(k)}
+          >
             {k === "ALL" ? "All" : k[0] + k.slice(1).toLowerCase() + "s"}
           </Button>
         ))}
-        <span className="ml-auto self-center text-xs text-muted-foreground">{shown.length} files</span>
+        <span className="ml-auto self-center text-xs text-muted-foreground">
+          {shown.length} files
+        </span>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
@@ -125,17 +116,29 @@ export function MediaLibrary({ initial }: { initial: AssetSummary[] }) {
                 <span className="relative block aspect-video bg-graphite">
                   {a.status === "READY" ? (
                     // eslint-disable-next-line @next/next/no-img-element -- admin thumbnail, any provider host
-                    <img src={assetThumb(a)} alt={a.alt} loading="lazy" className="size-full object-cover" />
+                    <img
+                      src={assetThumb(a)}
+                      alt={a.alt}
+                      loading="lazy"
+                      className="size-full object-cover"
+                    />
                   ) : (
-                    <span className="grid size-full place-items-center text-xs text-muted-foreground">{a.status.toLowerCase()}…</span>
+                    <TileStatus asset={a} />
                   )}
                   {a.kind === "VIDEO" && a.duration ? (
-                    <span className="absolute right-1 bottom-1 rounded bg-ink/80 px-1.5 text-[10px] text-ivory">▶ {clockDuration(a.duration)}</span>
+                    <span className="absolute right-1 bottom-1 rounded bg-ink/80 px-1.5 text-[10px] text-ivory">
+                      ▶ {clockDuration(a.duration)}
+                    </span>
                   ) : null}
                 </span>
                 <span className="flex items-center justify-between gap-2 px-2 py-1.5">
                   <span className="truncate text-xs text-muted-foreground">{a.filename}</span>
-                  {!a.alt && a.kind === "IMAGE" ? <span className="size-1.5 shrink-0 rounded-full bg-red" title="Missing alt text" /> : null}
+                  {!a.alt && a.kind === "IMAGE" ? (
+                    <span
+                      className="size-1.5 shrink-0 rounded-full bg-red"
+                      title="Missing alt text"
+                    />
+                  ) : null}
                 </span>
               </button>
             </li>
@@ -143,8 +146,17 @@ export function MediaLibrary({ initial }: { initial: AssetSummary[] }) {
         </ul>
 
         <aside className="xl:sticky xl:top-8 xl:self-start">
-          {current ? <AssetPanel key={current.id} asset={current} onChanged={refresh} onDeleted={() => (setSelected(null), refresh())} /> : (
-            <p className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">Select a file to edit its alt text or delete it.</p>
+          {current ? (
+            <AssetPanel
+              key={current.id}
+              asset={current}
+              onChanged={refresh}
+              onDeleted={() => (setSelected(null), refresh())}
+            />
+          ) : (
+            <p className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">
+              Select a file to edit its alt text or delete it.
+            </p>
           )}
         </aside>
       </div>
@@ -152,23 +164,99 @@ export function MediaLibrary({ initial }: { initial: AssetSummary[] }) {
   );
 }
 
-function AssetPanel({ asset, onChanged, onDeleted }: { asset: AssetSummary; onChanged: () => void; onDeleted: () => void }) {
+/** Placeholder for a tile that isn't READY: import progress, processing, or the failure. */
+function TileStatus({ asset }: { asset: AssetSummary }) {
+  const job = asset.import;
+  if (job?.status === "RUNNING") {
+    const pct = job.bytesTotal ? Math.round((job.bytesDone / job.bytesTotal) * 100) : 0;
+    return (
+      <span className="flex size-full flex-col justify-end gap-1.5 p-2 text-[10px] text-muted-foreground">
+        <span>Importing from Drive · {pct}%</span>
+        <span
+          className="block h-0.5 bg-ink"
+          role="progressbar"
+          aria-label={`${asset.filename} import`}
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <span className="block h-full bg-red transition-[width]" style={{ width: `${pct}%` }} />
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "grid size-full place-items-center text-xs",
+        asset.status === "ERRORED" ? "text-red-bright" : "text-muted-foreground",
+      )}
+    >
+      {asset.status === "ERRORED" ? "failed" : `${asset.status.toLowerCase()}…`}
+    </span>
+  );
+}
+
+function AssetPanel({
+  asset,
+  onChanged,
+  onDeleted,
+}: {
+  asset: AssetSummary;
+  onChanged: () => void;
+  onDeleted: () => void;
+}) {
   const [alt, setAlt] = useState(asset.alt);
   const [pending, startTransition] = useTransition();
+  const failedImport = asset.import?.status === "FAILED";
   return (
     <div className="space-y-4 rounded-md border border-border bg-onyx p-4">
-      {/* eslint-disable-next-line @next/next/no-img-element -- admin preview */}
-      <img src={assetThumb(asset)} alt="" className="aspect-video w-full rounded object-cover" />
+      {asset.status === "READY" ? (
+        // eslint-disable-next-line @next/next/no-img-element -- admin preview
+        <img src={assetThumb(asset)} alt="" className="aspect-video w-full rounded object-cover" />
+      ) : (
+        <div className="aspect-video w-full overflow-hidden rounded bg-graphite">
+          <TileStatus asset={asset} />
+        </div>
+      )}
+      {failedImport ? (
+        <div className="space-y-2 rounded-md border border-oxblood p-3 text-xs">
+          <p className="text-red-bright">{asset.import?.error ?? "The import failed."}</p>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                await retryImportAction(asset.id);
+                toast.success("Import restarted from where it stopped");
+                onChanged();
+              })
+            }
+          >
+            Retry import
+          </Button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-1.5">
         <Badge variant="outline">{asset.kind.toLowerCase()}</Badge>
         <Badge variant="outline">{asset.provider}</Badge>
-        <Badge variant={asset.status === "READY" ? "secondary" : "outline"}>{asset.status.toLowerCase()}</Badge>
-        {asset.width ? <Badge variant="outline">{asset.width}×{asset.height}</Badge> : null}
-        {asset.bytes ? <Badge variant="outline">{(asset.bytes / 1024 / 1024).toFixed(1)} MB</Badge> : null}
+        <Badge variant={asset.status === "READY" ? "secondary" : "outline"}>
+          {asset.status.toLowerCase()}
+        </Badge>
+        {asset.width ? (
+          <Badge variant="outline">
+            {asset.width}×{asset.height}
+          </Badge>
+        ) : null}
+        {asset.bytes ? (
+          <Badge variant="outline">{(asset.bytes / 1024 / 1024).toFixed(1)} MB</Badge>
+        ) : null}
       </div>
       <p className="truncate text-sm text-ivory">{asset.filename}</p>
       <label className="block text-xs text-muted-foreground">
-        Alt text {asset.kind === "IMAGE" ? "(describe the image for screen readers and search)" : ""}
+        Alt text{" "}
+        {asset.kind === "IMAGE" ? "(describe the image for screen readers and search)" : ""}
         <Input value={alt} onChange={(e) => setAlt(e.target.value)} className="mt-1" />
       </label>
       <div className="flex flex-wrap gap-2">
