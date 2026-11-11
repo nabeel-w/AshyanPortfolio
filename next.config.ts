@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts", "motion"],
+    // A restored build cache (Vercel keeps .next/cache) served a stale globals.css: the Tailwind loader
+    // does not invalidate under it. Compiling takes ~7 s, so correctness wins. docs/08.
+    turbopackFileSystemCacheForBuild: false,
   },
   turbopack: {
     rules: {
