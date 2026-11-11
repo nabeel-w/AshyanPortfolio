@@ -1,5 +1,16 @@
 # 06 · Roadmap
 
+Tracked as GitHub issues, labelled `phase-1` … `phase-6`, plus `decision` for client inputs ([#1](https://github.com/nabeel-w/AshyanPortfolio/issues/1)).
+
+| Phase | Issues |
+|---|---|
+| 1 · Data | #2 Neon + migration + seed · #3 cached content queries · #4 project pages |
+| 2 · Media | #5 media adapter + uploads · #6 media library · #7 VideoLoop / FilmPlayer |
+| 3 · Editor | #8 preview route + bridge · #9 3-pane editor · #10 publish + revisions |
+| 4 · Admin | #11 projects · #12 client logos · #13 contact + inbox · #14 settings |
+| 5 · Analytics | #15 collection · #16 rollups · #17 dashboard |
+| 6 · Launch | #18 motion polish · #19 SEO/GEO · #20 mobile perf + a11y audit · #21 launch |
+
 | Phase | Scope | Status |
 |---|---|---|
 | **0 · Foundation** | Next 16 + TS + Tailwind v4 + shadcn, pnpm, Prisma 7 + Neon schema, Better Auth, env validation, design tokens, fonts, home page from fallback content, blade cursor, SEO basics (metadata, JSON-LD, sitemap, robots, llms.txt), plan docs | ✅ Done |
