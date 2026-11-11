@@ -8,14 +8,15 @@ const parse = (container: HTMLElement) =>
 
 describe("JSON-LD", () => {
   it("describes Ashyan as a Person with profiles linked via sameAs", () => {
-    const { container } = render(<JsonLd data={personJsonLd(site)} />);
+    const withProfiles = { ...site, socials: [{ label: "Vimeo", href: "https://vimeo.com/ashyanzafar" }] };
+    const { container } = render(<JsonLd data={personJsonLd(withProfiles)} />);
     expect(parse(container)).toMatchObject({
       "@context": "https://schema.org",
       "@type": "Person",
       "@id": "http://localhost:3000/#person",
       name: site.name,
       jobTitle: site.role,
-      sameAs: site.socials.map((s) => s.href),
+      sameAs: ["https://vimeo.com/ashyanzafar"],
     });
   });
 

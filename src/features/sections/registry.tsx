@@ -5,6 +5,7 @@ import { ClientList } from "@/components/site/client-list";
 import { ClientMarquee } from "@/components/site/client-marquee";
 import { ContactCta } from "@/components/site/contact-cta";
 import { ContactSection, type SiteContact } from "@/components/site/contact-section";
+import { Faq } from "@/components/site/faq";
 import { Hero } from "@/components/site/hero";
 import { PageHeader } from "@/components/site/page-header";
 import { Services } from "@/components/site/services";
@@ -33,6 +34,7 @@ export const sectionRegistry: Registry = {
   clientList: { label: "Client list", description: "Grouped client names (brands, agencies…)", component: ClientList },
   contactCta: { label: "Contact CTA", description: "“Let's talk” block with email", component: ContactCta },
   contactForm: { label: "Contact form", description: "Enquiry form with contact details", component: ContactSection },
+  faq: { label: "Questions & answers", description: "Question-style subheads with short answers (great for search and AI answers)", component: Faq },
 };
 
 /** Renders a page's sections in order. Used by the public site AND the admin live preview. */

@@ -23,6 +23,13 @@ const contentFields: FieldDef[] = [
   { type: "textarea", name: "summary", label: "Summary", rows: 2, help: "One or two sentences. Shown under the title and used as the meta description (≤ 160 characters)." },
   { type: "textarea", name: "story", label: "Story", rows: 8, help: "The brief, your approach and the result. Separate paragraphs with a blank line. Search engines and AI assistants read this." },
   {
+    type: "textarea",
+    name: "transcript",
+    label: "Film transcript",
+    rows: 6,
+    help: "Optional. The spoken words / captions of the film. Shown under the film and given to search engines as the video transcript.",
+  },
+  {
     type: "list",
     name: "credits",
     label: "Credits",

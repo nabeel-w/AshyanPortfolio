@@ -1,4 +1,5 @@
 import { getSite, getWorkList } from "@/features/content/queries";
+import { profileUrls } from "@/features/seo/json-ld";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
@@ -20,8 +21,14 @@ export async function GET() {
     "## Selected work",
     ...projects.map((p) => `- [${p.title}](${absoluteUrl(`/work/${p.slug}`)}): ${p.format}, ${p.year}`),
     "",
+    "## Pages",
+    `- [About](${absoluteUrl("/about")}): biography, services and Q&A`,
+    `- [Work](${absoluteUrl("/work")}): all films`,
+    `- [Contact](${absoluteUrl("/contact")}): enquiries`,
+    `- [Full text for AI assistants](${absoluteUrl("/llms-full.txt")})`,
+    "",
     "## Profiles",
-    ...site.socials.map((s) => `- [${s.label}](${s.href})`),
+    ...site.socials.filter((s) => profileUrls([s]).length).map((s) => `- [${s.label}](${s.href})`),
     "",
   ].join("\n");
 

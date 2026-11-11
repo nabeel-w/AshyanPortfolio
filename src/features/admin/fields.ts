@@ -145,6 +145,27 @@ export const sectionFields: Record<SectionType, FieldDef[]> = {
     { type: "email", name: "email", label: "Email" },
     { type: "text", name: "note", label: "Small print" },
   ],
+  faq: [
+    { type: "text", name: "eyebrow", label: "Eyebrow" },
+    { type: "richtext", name: "title", label: "Title" },
+    {
+      type: "note",
+      name: "faqNote",
+      text: "Write each question the way a client would ask it, and answer in 40–60 plain, factual words. Search engines and AI assistants quote these directly.",
+    },
+    {
+      type: "list",
+      name: "items",
+      label: "Questions",
+      itemTitle: "question",
+      addLabel: "Add question",
+      newItem: { question: "", answer: "" },
+      item: [
+        { type: "text", name: "question", label: "Question" },
+        { type: "textarea", name: "answer", label: "Answer", rows: 4 },
+      ],
+    },
+  ],
   contactForm: [
     { type: "note", name: "contactNote", text: "Email, WhatsApp and social links come from Admin → Settings." },
     { type: "lines", name: "projectTypes", label: "Project types", help: "Options in the form's dropdown, one per line." },
@@ -175,6 +196,7 @@ export const settingsFields: FieldDef[] = [
     type: "list",
     name: "socials",
     label: "Profiles",
+    help: "Use full profile URLs (e.g. https://vimeo.com/ashyanzafar). IMDb, Vimeo, LinkedIn, Instagram and Behance help search engines and AI assistants confirm who you are.",
     itemTitle: "label",
     addLabel: "Add profile",
     newItem: { label: "", href: "https://" },

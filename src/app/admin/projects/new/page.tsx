@@ -14,6 +14,7 @@ export default function NewProjectPage() {
         role: "",
         summary: "",
         story: "",
+        transcript: "",
         credits: [],
         featured: false,
         order: 0,

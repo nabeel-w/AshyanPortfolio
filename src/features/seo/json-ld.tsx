@@ -18,6 +18,23 @@ export function JsonLd({ data }: { data: WithContext<Person> | WithContext<WebSi
   );
 }
 
+/**
+ * Only real profile URLs belong in sameAs: a bare domain ("https://instagram.com/") would claim the
+ * whole platform as Ashyan. Requires a path beyond "/".
+ */
+export function profileUrls(socials: { href: string }[]): string[] {
+  return socials
+    .map((s) => s.href)
+    .filter((href) => {
+      try {
+        const u = new URL(href);
+        return /^https?:$/.test(u.protocol) && u.pathname.replace(/\/+$/, "").length > 0;
+      } catch {
+        return false;
+      }
+    });
+}
+
 export function personJsonLd(site: Site): WithContext<Person> {
   return {
     "@context": "https://schema.org",
@@ -28,7 +45,8 @@ export function personJsonLd(site: Site): WithContext<Person> {
     description: site.description,
     url: absoluteUrl("/"),
     email: `mailto:${site.email}`,
-    sameAs: site.socials.map((s) => s.href),
+    sameAs: profileUrls(site.socials),
+    homeLocation: site.location ? { "@type": "Place", name: site.location } : undefined,
     knowsAbout: ["Film editing", "Colour grading", "Sound design", "Motion graphics", "Post-production"],
   };
 }
@@ -65,6 +83,7 @@ export function projectJsonLd(p: ProjectDetail, site: Site) {
           duration: p.film.duration ? isoDuration(p.film.duration) : undefined,
           contentUrl: mux.mp4(p.film.playbackId),
           embedUrl: url,
+          transcript: p.transcript || undefined,
         }
       : {}),
   };
@@ -77,6 +96,40 @@ export function projectJsonLd(p: ProjectDetail, site: Site) {
     ],
   };
   return { "@context": "https://schema.org", "@graph": [work, breadcrumbs] };
+}
+
+/** /about: a ProfilePage whose main entity is the #person node (same @id as the site-wide Person). */
+export function profilePageJsonLd(site: Site, dateModified?: Date) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "@id": absoluteUrl("/about#page"),
+    url: absoluteUrl("/about"),
+    name: `About ${site.name}`,
+    dateModified: dateModified?.toISOString(),
+    mainEntity: { "@id": absoluteUrl("/#person") },
+    breadcrumb: {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+        { "@type": "ListItem", position: 2, name: "About", item: absoluteUrl("/about") },
+      ],
+    },
+  };
+}
+
+/** Mirrors a visible Q&A section exactly (no hidden answers). */
+export function faqJsonLd(items: { question: string; answer: string }[], pageUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": `${pageUrl}#faq`,
+    mainEntity: items.map((i) => ({
+      "@type": "Question",
+      name: i.question,
+      acceptedAnswer: { "@type": "Answer", text: i.answer },
+    })),
+  };
 }
 
 export function websiteJsonLd(site: Site): WithContext<WebSite> {

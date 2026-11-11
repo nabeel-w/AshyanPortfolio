@@ -169,6 +169,8 @@ model Project {
   summary     String?       // ≤ 160 chars — doubles as meta description
   /// Long-form write-up (brief, approach, result). Paragraphs separated by blank lines. Crawlable text for SEO/GEO.
   story       String?
+  /// Film transcript / captions text — shown on the page and used as VideoObject.transcript (SEO/GEO)
+  transcript  String?
   /// Rich body blocks (same block schema as page sections)
   body        Json?
   credits     Json?         // [{ role, name }]

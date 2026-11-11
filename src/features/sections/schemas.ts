@@ -101,6 +101,16 @@ export const clientListSchema = z.object({
   groups: z.array(z.object({ label: z.string(), names: z.array(z.string()).default([]) })).default([]),
 });
 
+/**
+ * Question-shaped subheads with short, factual answers (40–60 words). Rendered fully visible and
+ * emitted as FAQPage JSON-LD — the format AI answer engines quote most readily (GEO).
+ */
+export const faqSchema = z.object({
+  eyebrow: z.string().default("Questions"),
+  title: z.string().default("Working *together*"),
+  items: z.array(z.object({ question: z.string().min(1), answer: z.string().min(1) })).default([]),
+});
+
 /** Contact page: enquiry form + contact details sidebar. Email/WhatsApp/socials come from Site settings. */
 export const contactFormSchema = z.object({
   projectTypes: z
@@ -127,6 +137,7 @@ export const sectionSchemas = {
   services: servicesSchema,
   clientList: clientListSchema,
   contactForm: contactFormSchema,
+  faq: faqSchema,
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;

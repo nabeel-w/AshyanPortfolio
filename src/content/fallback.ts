@@ -201,6 +201,37 @@ export const pageSections: Record<"home" | "work" | "about" | "contact", Section
       },
     },
     {
+      id: "about-faq",
+      type: "faq",
+      visible: true,
+      data: {
+        eyebrow: "Questions",
+        title: "Working *together*",
+        items: [
+          {
+            question: "What does a film editor do on a commercial?",
+            answer:
+              "On a commercial I turn the shoot into a story that lands in seconds. I build the structure, choose performances, set the rhythm against music and sound, and shape cut-downs for every format — working with the director and agency from first assembly through to the final graded, mixed master.",
+          },
+          {
+            question: "How long does it take to edit a brand film?",
+            answer:
+              "A 60–90 second brand film usually takes one to two weeks: an assembly in two or three days, then review rounds with the director and client, followed by colour, sound and delivery. Documentaries and long-form projects are scoped individually once I have seen the material and the deadline.",
+          },
+          {
+            question: "Do you work remotely with teams outside India?",
+            answer:
+              "Yes — most of my projects are remote. I work from shared storage or proxies, plug into your review tools, and keep to your time zone for feedback sessions. Fast, secure transfers and clear versioning mean a remote edit runs as smoothly as having me in the room.",
+          },
+          {
+            question: "Can you also handle colour grading and sound?",
+            answer:
+              "I do. Many clients prefer one consistent hand from the first cut to the final master, so I offer colour grading, sound design and finishing alongside the edit. On larger productions I work with dedicated colourists and mixers and manage the turnover so nothing gets lost between departments.",
+          },
+        ],
+      },
+    },
+    {
       id: "about-cta",
       type: "contactCta",
       visible: true,

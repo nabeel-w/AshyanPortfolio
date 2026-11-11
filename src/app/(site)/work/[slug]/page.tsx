@@ -86,6 +86,14 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
               ))}
             </div>
           ) : null}
+          {p.transcript ? (
+            <details data-reveal className="group mt-10 max-w-2xl border-t border-hairline pt-6">
+              <summary className="label flex cursor-pointer list-none items-center gap-3 text-smoke hover:text-ivory">
+                <span className="text-red transition-transform group-open:rotate-90">▸</span> Transcript
+              </summary>
+              <p className="mt-4 text-sm leading-relaxed whitespace-pre-line text-ivory/65">{p.transcript}</p>
+            </details>
+          ) : null}
         </header>
 
         <aside data-reveal style={{ ["--i" as string]: 2 }} className="lg:col-span-4 lg:col-start-9">

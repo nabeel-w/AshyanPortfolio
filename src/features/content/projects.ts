@@ -20,6 +20,7 @@ export type ProjectDetail = {
   summary: string;
   /** Paragraphs */
   story: string[];
+  transcript?: string;
   credits: { role: string; name: string }[];
   cover: MediaImage;
   film?: Film;
@@ -104,6 +105,7 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     category: p.category?.name ?? "Film",
     summary: p.summary ?? "",
     story: paragraphs(p.story),
+    transcript: p.transcript?.trim() || undefined,
     credits: creditsSchema.parse(p.credits ?? []),
     cover,
     film: film(p.film),

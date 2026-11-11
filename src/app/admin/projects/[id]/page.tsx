@@ -24,6 +24,7 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
         role: p.role ?? "",
         summary: p.summary ?? "",
         story: p.story ?? "",
+        transcript: p.transcript ?? "",
         credits,
         featured: p.featured,
         order: p.order,
