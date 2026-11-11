@@ -28,8 +28,19 @@ async function main() {
       email: site.email,
       bio: site.description,
       socials: site.socials,
+      whatsapp: site.whatsapp,
+      whatsappMessage: site.whatsappMessage,
     },
   });
+
+  // Backfill settings added after the first seed (never overwrites admin edits).
+  const settings = await db.siteSettings.findUniqueOrThrow({ where: { id: "site" } });
+  if (settings.whatsapp == null && site.whatsapp) {
+    await db.siteSettings.update({
+      where: { id: "site" },
+      data: { whatsapp: site.whatsapp, whatsappMessage: site.whatsappMessage },
+    });
+  }
 
   const page = await db.page.upsert({
     where: { slug: "home" },

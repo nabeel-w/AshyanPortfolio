@@ -36,10 +36,12 @@ export async function getSite(): Promise<Site> {
     email: row.email ?? fallbackSite.email,
     description: row.bio ?? fallbackSite.description,
     socials: socials.success && socials.data.length ? socials.data : fallbackSite.socials,
+    whatsapp: row.whatsapp ?? fallbackSite.whatsapp,
+    whatsappMessage: row.whatsappMessage ?? fallbackSite.whatsappMessage,
   };
 }
 
-/** Published, featured-first projects mapped to work-grid cards. Empty until projects are added (#11). */
+/** Published, featured-first projects mapped to work-grid cards (hover loop only once it is READY). */
 export async function getPublishedProjects(): Promise<WorkItem[]> {
   "use cache";
   cacheTag(tags.projects);
@@ -68,7 +70,7 @@ export async function getPublishedProjects(): Promise<WorkItem[]> {
           height: cover.height ?? undefined,
           blurDataUrl: cover.blurDataUrl ?? undefined,
         },
-        loopPlaybackId: p.loop?.playbackId ?? undefined,
+        loopPlaybackId: p.loop?.status === "READY" ? (p.loop.playbackId ?? undefined) : undefined,
       },
     ];
   });

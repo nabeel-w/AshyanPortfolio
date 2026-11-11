@@ -11,6 +11,8 @@ export const site = {
   location: "India · Working worldwide",
   email: "hello@ashyanzafar.com",
   copyrightYear: 2026,
+  whatsapp: "+91 83349 08607" as string | null,
+  whatsappMessage: "Hi Ashyan, I saw your portfolio and would love to talk about a project.",
   description:
     "Ashyan Zafar is an independent film editor crafting commercials, fashion films, documentaries and branded content with rhythm, restraint and emotion.",
   socials: [

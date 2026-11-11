@@ -147,7 +147,7 @@ describe("getPublishedPage", () => {
           height: 900,
           blurDataUrl: "data:x",
         },
-        loop: { playbackId: "pb_loop" },
+        loop: { playbackId: "pb_loop", status: "READY" },
       },
     ]);
     const [section] = await getPublishedPage("home");
@@ -169,6 +169,20 @@ describe("getPublishedPage", () => {
         loopPlaybackId: "pb_loop",
       },
     ]);
+  });
+
+  it("ignores hover loops that are still processing", async () => {
+    db.project.findMany.mockResolvedValue([
+      {
+        slug: "p",
+        title: "P",
+        createdAt: new Date("2026-01-01"),
+        cover: { url: "https://cdn/p.webp", alt: "" },
+        loop: { playbackId: "pb", status: "PROCESSING" },
+      },
+    ]);
+    const [item] = await getPublishedProjects();
+    expect(item!.loopPlaybackId).toBeUndefined();
   });
 
   it("hydrates the marquee from client rows", async () => {

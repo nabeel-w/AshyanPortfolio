@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { SectionProps } from "@/features/sections/schemas";
+import { VideoLoop } from "@/components/media/video-loop";
 import { cn } from "@/lib/utils";
 
 type Project = SectionProps<"workGrid">["projects"][number];
@@ -88,8 +89,12 @@ function WorkCard({ project, large, index }: { project: Project; large: boolean;
           }
           loading={index < 2 ? "eager" : "lazy"}
           quality={90}
+          placeholder={project.cover.blurDataUrl ? "blur" : "empty"}
+          blurDataURL={project.cover.blurDataUrl}
           className="object-cover transition-[transform,filter] duration-[1.4s] ease-out-expo group-hover:scale-[1.04] md:brightness-[0.82] md:group-hover:brightness-100"
         />
+        {/* Hover (desktop) / in-view (touch) preview loop over the hi-res still */}
+        {project.loopPlaybackId ? <VideoLoop playbackId={project.loopPlaybackId} /> : null}
         {/* Playhead sweep */}
         <span
           aria-hidden

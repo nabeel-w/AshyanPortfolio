@@ -167,6 +167,8 @@ model Project {
   year        Int?
   role        String?       // "Edit · Colour · Sound"
   summary     String?       // ≤ 160 chars — doubles as meta description
+  /// Long-form write-up (brief, approach, result). Paragraphs separated by blank lines. Crawlable text for SEO/GEO.
+  story       String?
   /// Rich body blocks (same block schema as page sections)
   body        Json?
   credits     Json?         // [{ role, name }]
@@ -283,6 +285,9 @@ model SiteSettings {
   /// Short factual bio used for llms.txt + Person JSON-LD (GEO)
   bio           String?
   availability  String?
+  /// E.164 number for the floating WhatsApp button, e.g. "+91 83349 08607"
+  whatsapp        String?
+  whatsappMessage String?
   updatedAt     DateTime @updatedAt
 }
 

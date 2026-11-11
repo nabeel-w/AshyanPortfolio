@@ -58,7 +58,7 @@ async function main() {
       ? bad(`\n${failures} provider(s) in use need attention.\n`)
       : ok("\nStorage is ready.\n"),
   );
-  process.exit(failures ? 1 : 0);
+  process.exitCode = failures ? 1 : 0;
 }
 
 void main();

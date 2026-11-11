@@ -83,6 +83,33 @@ export async function applyWebhook(providerId: string, request: Request) {
   return db.asset.update({ where: { id: asset.id }, data: toUpdate(update.result) });
 }
 
+/**
+ * Server-side upload of an in-memory file through the same provider pipeline the browser uses
+ * (seeding, imports). Streaming video may come back PROCESSING — poll `completeUpload` or rely on the webhook.
+ */
+export async function ingest(file: Buffer, meta: { filename: string; mimeType: string; alt?: string }) {
+  const ticket = await createUpload({ filename: meta.filename, mimeType: meta.mimeType, bytes: file.length });
+  const body = new Uint8Array(file);
+  const { upload } = ticket;
+  if (upload.strategy === "put") {
+    const url = upload.url.startsWith("/") ? `${process.env.NEXT_PUBLIC_SITE_URL}${upload.url}` : upload.url;
+    await expectOk(await fetch(url, { method: "PUT", body, headers: { "Content-Type": meta.mimeType, ...upload.headers } }), "ingest PUT");
+  } else if (upload.strategy === "form-post") {
+    const form = new FormData();
+    form.append(upload.fieldName, new Blob([body], { type: meta.mimeType }), meta.filename);
+    await expectOk(await fetch(upload.url, { method: "POST", body: form }), "ingest POST");
+  } else {
+    const { put } = await import("@vercel/blob/client");
+    await put(upload.pathname, new Blob([body], { type: meta.mimeType }), {
+      access: "public",
+      token: upload.token,
+      contentType: upload.contentType,
+    });
+  }
+  if (meta.alt) await db.asset.update({ where: { id: ticket.assetId }, data: { alt: meta.alt } });
+  return completeUpload(ticket.assetId);
+}
+
 /** Remove from the provider first, then the DB row (relations are SetNull / Cascade in the schema). */
 export async function deleteAsset(assetId: string) {
   const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });

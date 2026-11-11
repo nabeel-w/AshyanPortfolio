@@ -1,6 +1,7 @@
 import { BladeCursor } from "@/components/site/blade-cursor";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
+import { WhatsAppButton } from "@/components/site/whatsapp-button";
 import { getSite } from "@/features/content/queries";
 import { JsonLd, personJsonLd, websiteJsonLd } from "@/features/seo/json-ld";
 
@@ -18,6 +19,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
       <main id="main">{children}</main>
       <SiteFooter />
       <BladeCursor />
+      {site.whatsapp ? <WhatsAppButton phone={site.whatsapp} message={site.whatsappMessage} /> : null}
       <JsonLd data={personJsonLd(site)} />
       <JsonLd data={websiteJsonLd(site)} />
     </>

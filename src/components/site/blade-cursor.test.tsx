@@ -51,7 +51,7 @@ describe("<BladeCursor>", () => {
     vi.stubGlobal("requestAnimationFrame", vi.fn());
     const { container } = render(
       <>
-        <a href="/work/x" data-cursor="play">
+        <a href="#film" data-cursor="play">
           film
         </a>
         <BladeCursor />
