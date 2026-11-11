@@ -5,8 +5,8 @@ export function ContactCta({ label, headline, email, note }: SectionProps<"conta
   return (
     <section id="contact" aria-labelledby="contact-title" className="scroll-mt-20 bg-ink py-24 md:py-36">
       <div className="container-site text-center">
-        <p className="label mb-6 text-red">{label}</p>
-        <h2 id="contact-title" className="mx-auto max-w-4xl font-serif text-headline text-ivory [text-wrap:balance]">
+        <p data-reveal className="label mb-6 text-red">{label}</p>
+        <h2 data-reveal style={{ ["--i" as string]: 1 }} id="contact-title" className="mx-auto max-w-4xl font-serif text-headline text-ivory [text-wrap:balance]">
           <RichText text={headline} />
         </h2>
         <a

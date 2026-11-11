@@ -56,7 +56,7 @@ Editors write headlines with `*italic red*` and `**SANS CAPS**`. `RichText` rend
 
 - **Editing grammar**: cuts, wipes, playheads and timecode. `ease-cut` (`cubic-bezier(.77,0,.175,1)`) for wipes, `ease-out-expo` for reveals.
 - Hover on a work card plays a red playhead sweep, a slow 1.04 zoom and the cursor's PLAY ring. Later the card also plays a muted Mux loop.
-- Section reveals: fade up 24px, staggered by 60ms, once only. Use `motion` for these, lazily imported, only where it adds something.
+- Section reveals: fade up 24px, staggered by 60ms, once only. Built with one IntersectionObserver + CSS transitions (no animation library, ~1 KB). Frames and stills use a **wipe**: a cover slides off left→right with a glowing red playhead on its edge. Nothing above the fold is revealed (LCP stays instant).
 - Smooth scroll (Lenis) on desktop only. Native scroll on touch.
 - `prefers-reduced-motion` turns off the marquee, cursor, timecode and reveals.
 

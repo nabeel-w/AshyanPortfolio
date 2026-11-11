@@ -80,7 +80,7 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
             <p className="mt-6 max-w-2xl font-serif text-2xl leading-snug text-ivory/80 md:text-3xl">{p.summary}</p>
           ) : null}
           {p.story.length ? (
-            <div className="mt-10 max-w-2xl space-y-5 text-[1.0625rem] leading-relaxed text-ivory/70">
+            <div data-reveal className="mt-10 max-w-2xl space-y-5 text-[1.0625rem] leading-relaxed text-ivory/70">
               {p.story.map((para, i) => (
                 <p key={i}>{para}</p>
               ))}
@@ -88,7 +88,7 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
           ) : null}
         </header>
 
-        <aside className="lg:col-span-4 lg:col-start-9">
+        <aside data-reveal style={{ ["--i" as string]: 2 }} className="lg:col-span-4 lg:col-start-9">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-t border-hairline pt-6 lg:grid-cols-1">
             {facts.map(([k, v]) => (
               <div key={k}>
@@ -118,7 +118,7 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
           <ul className="grid gap-2 sm:grid-cols-2">
             {p.gallery.map((g, i) => (
               <li key={g.src} className={i % 3 === 0 ? "sm:col-span-2" : undefined}>
-                <div className="relative aspect-video overflow-hidden bg-onyx">
+                <div data-reveal="wipe" className="relative aspect-video overflow-hidden bg-onyx">
                   <Image src={g.src} alt={g.alt} fill sizes="(min-width: 640px) 50vw, 100vw" quality={90} className="object-cover" />
                 </div>
               </li>

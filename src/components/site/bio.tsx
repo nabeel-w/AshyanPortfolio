@@ -9,7 +9,7 @@ export function Bio({ media, stats, body }: SectionProps<"bio">) {
       <div className="container-site grid gap-12 lg:grid-cols-12 lg:gap-16">
         <div className="lg:col-span-5">
           <div>
-            <div className="relative aspect-4/5 overflow-hidden border border-hairline">
+            <div data-reveal="wipe" className="relative aspect-4/5 overflow-hidden border border-hairline">
               <Image
                 src={media.src}
                 alt={media.alt}
@@ -29,14 +29,14 @@ export function Bio({ media, stats, body }: SectionProps<"bio">) {
           {stats.length ? (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-8 border-b border-hairline pb-10 sm:grid-cols-4">
               {stats.map((s, i) => (
-                <div key={`${s.label}-${i}`} className="flex flex-col-reverse gap-2">
+                <div key={`${s.label}-${i}`} data-reveal style={{ ["--i" as string]: i }} className="flex flex-col-reverse gap-2">
                   <dt className="label text-smoke">{s.label}</dt>
                   <dd className={`font-serif text-5xl md:text-6xl ${i === 0 ? "text-red" : "text-ivory"}`}>{s.value}</dd>
                 </div>
               ))}
             </dl>
           ) : null}
-          <div className="mt-10 max-w-2xl space-y-5 text-[1.0625rem] leading-relaxed text-ivory/75">
+          <div data-reveal className="mt-10 max-w-2xl space-y-5 text-[1.0625rem] leading-relaxed text-ivory/75">
             {paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}

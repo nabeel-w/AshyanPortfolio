@@ -6,14 +6,16 @@ export function Services({ eyebrow, title, items }: SectionProps<"services">) {
   return (
     <section aria-labelledby="services-title" className="border-t border-hairline bg-ink py-20 md:py-32">
       <div className="container-site">
-        <p className="label mb-4 text-red">{eyebrow}</p>
-        <h2 id="services-title" className="mb-12 font-serif text-headline text-ivory md:mb-16">
+        <p data-reveal className="label mb-4 text-red">{eyebrow}</p>
+        <h2 data-reveal id="services-title" className="mb-12 font-serif text-headline text-ivory md:mb-16">
           <RichText text={title} />
         </h2>
         <ul className="grid gap-3 md:grid-cols-2">
           {items.map((item, i) => (
             <li
               key={`${item.title}-${i}`}
+              data-reveal
+              style={{ ["--i" as string]: i % 2 }}
               className="group flex flex-col border border-hairline bg-onyx p-6 transition-colors duration-500 hover:border-red/50 md:p-8"
             >
               <span className="label text-red tabular-nums">{String(i + 1).padStart(2, "0")}</span>

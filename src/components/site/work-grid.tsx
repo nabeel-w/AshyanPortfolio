@@ -20,7 +20,7 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
       className={cn("scroll-mt-20 py-20 md:py-32", tone === "paper" ? "tone-paper" : "bg-ink")}
     >
       <div className="container-site">
-        <div className="mb-10 flex flex-col gap-6 border-b border-hairline pb-6 md:mb-14 md:flex-row md:items-end md:justify-between">
+        <div data-reveal className="mb-10 flex flex-col gap-6 border-b border-hairline pb-6 md:mb-14 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="label mb-3 text-muted-foreground tabular-nums">
               <span className="text-red">●</span> Reel / {String(projects.length).padStart(2, "0")} films
@@ -59,6 +59,8 @@ function WorkCard({ project, large, index }: { project: Project; large: boolean;
   return (
     <Link href={`/work/${project.slug}`} data-cursor="play" className="group block">
       <div
+        data-reveal="wipe"
+        style={{ ["--i" as string]: index % 3 }}
         className={cn(
           "relative overflow-hidden border border-hairline bg-onyx",
           "aspect-video",
@@ -91,7 +93,7 @@ function WorkCard({ project, large, index }: { project: Project; large: boolean;
           {project.category}
         </span>
       </div>
-      <div className="mt-4 flex items-start justify-between gap-4">
+      <div data-reveal style={{ ["--i" as string]: (index % 3) + 2 }} className="mt-4 flex items-start justify-between gap-4">
         <div className="flex items-baseline gap-3">
           <span className="label text-red tabular-nums">{String(index + 1).padStart(2, "0")}</span>
           <div>
