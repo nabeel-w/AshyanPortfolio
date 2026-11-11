@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { site } from "@/content/fallback";
+import { getSite } from "@/features/content/queries";
 import { MobileMenu } from "./mobile-menu";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const site = await getSite();
   return (
     <header className="site-header fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)]">
       <div className="container-site flex h-16 items-center justify-between md:h-20">

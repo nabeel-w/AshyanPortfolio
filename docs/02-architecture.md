@@ -25,7 +25,8 @@
 │   ├── schema.prisma            # Auth, assets, projects, pages/sections, analytics
 │   ├── seed.ts                  # Site settings + home sections
 │   └── migrations/
-├── prisma.config.ts             # CLI config (uses DIRECT_URL)
+├── prisma.config.ts             # CLI config (loads .env.local; direct host for migrations)
+├── scripts/create-admin.ts      # pnpm admin:create
 ├── public/media/                # ChatGPT-generated on-brand stills (stand-ins until real frames)
 └── src/
     ├── proxy.ts                 # Optimistic /admin gate (cookie check only)
@@ -63,7 +64,7 @@
     ├── features/                # Domain logic, grouped by feature
     │   ├── sections/            # schemas.ts (zod) + registry.tsx (renderer). The editor's core
     │   ├── seo/                 # JSON-LD builders, metadata helpers
-    │   ├── content/             # Cached DB queries: getPublishedPage, getProjects…   (next)
+    │   ├── content/             # queries.ts ("use cache" + tags) · tags.ts · invalidate.ts (updateTag helpers)
     │   ├── media/               # Storage adapter interface + provider impls          (next)
     │   └── analytics/           # Beacon, ingest, rollups, dashboard queries          (next)
     ├── content/fallback.ts      # Placeholder content until the DB has content

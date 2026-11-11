@@ -1,15 +1,12 @@
-import { homeSections, site } from "@/content/fallback";
+import { getSite, getWorkList } from "@/features/content/queries";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
  * /llms.txt — a plain-markdown summary for AI answer engines (GEO).
- * No request data is read, so it prerenders at build. When it reads the DB, wrap the
- * query in "use cache" + cacheTag("site") so publishing refreshes it.
+ * Built from cached queries (tags "site" + "projects"), so it prerenders and refreshes on publish.
  */
-
-export function GET() {
-  const work = homeSections.find((s) => s.type === "workGrid");
-  const projects = work?.type === "workGrid" ? work.data.projects : [];
+export async function GET() {
+  const [site, projects] = await Promise.all([getSite(), getWorkList()]);
 
   const body = [
     `# ${site.name}`,

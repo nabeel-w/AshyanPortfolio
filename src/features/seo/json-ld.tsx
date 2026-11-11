@@ -1,5 +1,5 @@
 import type { Person, WebSite, WithContext } from "schema-dts";
-import { site } from "@/content/fallback";
+import type { Site } from "@/features/content/queries";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
@@ -16,7 +16,7 @@ export function JsonLd({ data }: { data: WithContext<Person> | WithContext<WebSi
   );
 }
 
-export function personJsonLd(): WithContext<Person> {
+export function personJsonLd(site: Site): WithContext<Person> {
   return {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -31,7 +31,7 @@ export function personJsonLd(): WithContext<Person> {
   };
 }
 
-export function websiteJsonLd(): WithContext<WebSite> {
+export function websiteJsonLd(site: Site): WithContext<WebSite> {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",

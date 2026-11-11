@@ -6,13 +6,11 @@ Cinematic portfolio and admin CMS for film editor **Ashyan Zafar**. Built with N
 
 ```bash
 pnpm install
-cp .env.example .env.local     # fill in Neon + auth values
-cp .env.example .env           # Prisma CLI reads .env
-pnpm db:migrate && pnpm db:seed
-pnpm dev                       # http://localhost:3000
+cp .env.example .env.local          # fill in Neon + auth values (Prisma CLI reads it too)
+pnpm db:deploy && pnpm db:seed      # apply migrations, seed settings + home sections
+pnpm admin:create you@example.com "Your Name"   # email must be in ADMIN_EMAILS; password prompt is hidden
+pnpm dev                            # http://localhost:3000 → /login → /admin
 ```
-
-Create the first admin by signing up with an email listed in `ADMIN_EMAILS` (see `prisma/seed.ts`), then visit `/login`.
 
 ## Docs
 

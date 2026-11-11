@@ -1,9 +1,11 @@
 import { BladeCursor } from "@/components/site/blade-cursor";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
+import { getSite } from "@/features/content/queries";
 import { JsonLd, personJsonLd, websiteJsonLd } from "@/features/seo/json-ld";
 
-export default function SiteLayout({ children }: LayoutProps<"/">) {
+export default async function SiteLayout({ children }: LayoutProps<"/">) {
+  const site = await getSite();
   return (
     <>
       <a
@@ -16,8 +18,8 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
       <main id="main">{children}</main>
       <SiteFooter />
       <BladeCursor />
-      <JsonLd data={personJsonLd()} />
-      <JsonLd data={websiteJsonLd()} />
+      <JsonLd data={personJsonLd(site)} />
+      <JsonLd data={websiteJsonLd(site)} />
     </>
   );
 }

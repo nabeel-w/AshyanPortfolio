@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Instrument_Serif, JetBrains_Mono } from "next/font/google";
-import { site } from "@/content/fallback";
+import { getSite } from "@/features/content/queries";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -21,28 +21,31 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: `${site.name} — ${site.role}`,
-    template: `%s — ${site.name}`,
-  },
-  description: site.description,
-  applicationName: site.name,
-  authors: [{ name: site.name, url: SITE_URL }],
-  creator: site.name,
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    siteName: site.name,
-    locale: "en",
-    url: "/",
-    title: `${site.name} — ${site.role}`,
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getSite();
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: `${site.name} — ${site.role}`,
+      template: `%s — ${site.name}`,
+    },
     description: site.description,
-  },
-  twitter: { card: "summary_large_image" },
-  robots: { index: true, follow: true, "max-image-preview": "large", "max-video-preview": -1 },
-};
+    applicationName: site.name,
+    authors: [{ name: site.name, url: SITE_URL }],
+    creator: site.name,
+    alternates: { canonical: "/" },
+    openGraph: {
+      type: "website",
+      siteName: site.name,
+      locale: "en",
+      url: "/",
+      title: `${site.name} — ${site.role}`,
+      description: site.description,
+    },
+    twitter: { card: "summary_large_image" },
+    robots: { index: true, follow: true, "max-image-preview": "large", "max-video-preview": -1 },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",

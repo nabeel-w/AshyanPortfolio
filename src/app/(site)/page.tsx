@@ -1,8 +1,8 @@
-import { homeSections } from "@/content/fallback";
+import { getPublishedPage } from "@/features/content/queries";
 import { SectionRenderer } from "@/features/sections/registry";
 
-// TODO(db): replace with getPublishedPage("home") — a "use cache" + cacheTag("page:home") query
-// that the admin "Publish" action invalidates. See docs/02-architecture.md#rendering--caching.
-export default function HomePage() {
-  return <SectionRenderer sections={homeSections} />;
+// Cached + tagged "page:home" — prerendered, refreshed only when the page is published.
+export default async function HomePage() {
+  const sections = await getPublishedPage("home");
+  return <SectionRenderer sections={sections} />;
 }

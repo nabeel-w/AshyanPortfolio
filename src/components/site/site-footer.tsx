@@ -1,6 +1,7 @@
-import { site } from "@/content/fallback";
+import { getSite } from "@/features/content/queries";
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const site = await getSite();
   return (
     <footer className="border-t border-hairline bg-ink pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="container-site flex flex-col gap-6 py-8 sm:flex-row sm:items-center sm:justify-between">

@@ -1,11 +1,9 @@
 import type { MetadataRoute } from "next";
-import { homeSections } from "@/content/fallback";
+import { getWorkList } from "@/features/content/queries";
 import { absoluteUrl } from "@/lib/site-url";
 
-// TODO(db): read published projects from Prisma (cached + tagged "projects").
-export default function sitemap(): MetadataRoute.Sitemap {
-  const work = homeSections.find((s) => s.type === "workGrid");
-  const projects = work?.type === "workGrid" ? work.data.projects : [];
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const projects = await getWorkList();
 
   return [
     { url: absoluteUrl("/"), changeFrequency: "weekly", priority: 1 },
@@ -13,7 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: absoluteUrl(`/work/${p.slug}`),
       changeFrequency: "monthly" as const,
       priority: 0.8,
-      images: [absoluteUrl(p.cover.src)],
+      images: [p.cover.src.startsWith("http") ? p.cover.src : absoluteUrl(p.cover.src)],
     })),
   ];
 }

@@ -2,15 +2,15 @@
  * Seeds site settings and the "home" page sections from the placeholder content.
  * Run: pnpm db:seed   (after `pnpm db:migrate`)
  *
- * The first admin account is NOT seeded — sign up with an email listed in ADMIN_EMAILS:
- *   curl -X POST http://localhost:3000/api/auth/sign-up/email \
- *     -H "Content-Type: application/json" \
- *     -d '{"name":"Ashyan Zafar","email":"<admin email>","password":"<12+ chars>"}'
+ * The first admin account is NOT seeded. Create it with (email must be in ADMIN_EMAILS):
+ *   pnpm admin:create <email> "<Full Name>"
  */
-import "dotenv/config";
+import { config } from "dotenv";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { homeSections, site } from "../src/content/fallback";
+
+config({ path: [".env.local", ".env"], quiet: true });
 
 const db = new PrismaClient({
   adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL! }),
