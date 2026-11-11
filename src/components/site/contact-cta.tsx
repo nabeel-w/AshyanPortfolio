@@ -11,6 +11,7 @@ export function ContactCta({ label, headline, email, note }: SectionProps<"conta
         </h2>
         <a
           href={`mailto:${email}`}
+          data-cta="email"
           className="group mt-10 inline-flex min-h-11 items-center gap-4 font-serif text-2xl text-ivory sm:text-3xl md:mt-14"
         >
           <span className="break-all sm:break-normal">{email}</span>

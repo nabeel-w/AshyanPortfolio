@@ -22,6 +22,7 @@
     "test:unit": "vitest run --project unit",
     "test:components": "vitest run --project components",
     "test:coverage": "vitest run --coverage",
+    "analytics:rollup": "tsx --conditions=react-server scripts/analytics-rollup.ts",
     "seed:media": "tsx --conditions=react-server scripts/seed-media.ts"
   },
   "dependencies": {
@@ -35,6 +36,7 @@
     "@prisma/adapter-neon": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@vercel/blob": "^2.9.0",
+    "@vercel/speed-insights": "2.0.0",
     "aws4fetch": "^1.0.20",
     "better-auth": "^1.7.20",
     "class-variance-authority": "^0.7.1",

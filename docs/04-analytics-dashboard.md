@@ -4,29 +4,32 @@ Purpose: show Ashyan **what work gets watched, where viewers come from (includin
 
 ## 1. Collection
 
-**Beacon** (`features/analytics/beacon.tsx`, a client island under 1 KB): sends events with `navigator.sendBeacon` to `POST /api/analytics`.
+**Beacon** (`features/analytics/beacon.tsx` + `track.ts`, a client island under 1 KB): sends events with `navigator.sendBeacon` to `POST /api/analytics`. The referrer and query string go with the first pageview of each document only.
 
 | Event | When | `value` / `label` |
 |---|---|---|
 | `PAGEVIEW` | Route change | — |
-| `PROJECT_OPEN` | Project page view | projectId |
+| `PROJECT_OPEN` | Not sent: the server sets `projectId` on every event whose path is `/work/<slug>`, so project opens = pageviews with a projectId | — |
 | `VIDEO_PLAY` | Player starts | projectId |
 | `VIDEO_PROGRESS` | Crosses 25/50/75% | 25 \| 50 \| 75 |
 | `VIDEO_COMPLETE` | Reaches 95%+ | 100 |
-| `CTA_CLICK` | "Let's talk", email, view work | label = CTA id |
+| `CTA_CLICK` | Any element with `data-cta="<id>"`, plus mailto/tel links | label = CTA id |
 | `OUTBOUND_CLICK` | Social / external links | label = host |
-| `CONTACT_SUBMIT` | Form success | — |
+| `CONTACT_SUBMIT` | Form success, recorded **server-side** in `submitContact` (the beacon can't send it, so leads can't be spoofed) | — |
 
 **Ingest** (`app/api/analytics/route.ts`, Node runtime):
 - Drop known bots (UA list) and admin sessions.
 - `visitorHash = sha256(ANALYTICS_SALT + day + ip + ua)`. This rotates daily, and the IP is **never stored**.
 - `source`: classify the referrer as `AI` (chatgpt.com, chat.openai.com, perplexity.ai, claude.ai, gemini.google.com, copilot.microsoft.com, you.com…), `SEARCH`, `SOCIAL`, `EMAIL`, `REFERRAL`, `DIRECT`, or by UTM.
 - Country from the platform geo header (`x-vercel-ip-country`), device and browser from the UA.
-- Write to `AnalyticsEvent`. Rate-limit by `sessionHash`.
+- Sessions: an event within 30 min of the visitor's previous one continues that session and inherits its source/referrer/UTM; a new external referrer or campaign starts a new session.
+- Write to `AnalyticsEvent`. Rate-limited per visitor (120 events/min, per instance). Same-origin only; invalid bodies get 400, everything valid gets 204 (filtered or not).
 
-**Rollup**: a nightly cron (`vercel.ts` crons, or Neon `pg_cron`) upserts `AnalyticsDaily` per day and path. The dashboard reads rollups for long ranges and raw events for today. Raw events are kept for 90 days.
+**Rollup** (`features/analytics/aggregate.ts` + `rollup.ts`): Vercel Cron (`vercel.json`, 00:15 UTC) calls `GET /api/cron/analytics` with `Authorization: Bearer $CRON_SECRET`. It rebuilds every finished UTC day without a rollup (always redoing yesterday) into `AnalyticsDaily` (per day + path; path `"*"` = whole site) and `AnalyticsDailyDim` (source, referrer, device, country, browser, cta, outbound), then deletes raw events older than 90 days. `pnpm analytics:rollup --from … --to …` backfills. The dashboard reads rollups and runs the **same** aggregation live over raw events for today and any day the cron hasn't covered, so the numbers always mean the same thing. (`vercel.json` rather than `vercel.ts`: `@vercel/config` was still 0.x and brand new.)
 
-**Complement**: enable Vercel **Speed Insights** (real-user Core Web Vitals) and optionally Web Analytics. Mux Data covers video quality of experience (startup time, rebuffering).
+Metric definitions: visitors = daily-unique visitor hashes, summed over days (the hash rotates daily, so a range can't dedupe across days). Avg watch = mean of the furthest milestone (0/25/50/75/100) reached per played session and film. A project's enquiries = sessions that viewed it and enquired the same day.
+
+**Complement**: Vercel **Speed Insights** (real-user Core Web Vitals) is mounted in the site layout (`@vercel/speed-insights` pinned to 2.0.0); it also has to be switched on in the Vercel project (Speed Insights tab) at launch. Web Analytics is optional. Mux Data covers video quality of experience (startup time, rebuffering).
 
 ## 2. Dashboard layout
 
@@ -47,12 +50,12 @@ Purpose: show Ashyan **what work gets watched, where viewers come from (includin
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Built with shadcn `chart` (Recharts), `table`, `card` and `tabs`. Colours come from the brand tokens: red is the primary series, ivory the secondary, greys for the rest. "AI" traffic is always highlighted in red because it tracks GEO.
+- Only the time series uses Recharts (shadcn `chart`, crosshair tooltip). KPI sparklines, ranked bars, the retention funnel, the device split and the tables are server-rendered HTML/SVG, so they cost no JS. Colours are a brand **emphasis** palette, not a categorical one: red marks the series that matters (film plays, AI traffic, completion), warm grey (#b8b3ab) everything else. The dataviz palette check passes CVD separation, normal-vision distance and contrast on onyx; it flags the greys as "reads gray", which is the point. Every multi-series chart has a legend, and every chart has a table view or printed values. "AI" traffic is always highlighted in red because it tracks GEO.
 - On a phone, tiles go 2-up, charts go full width, and tables become scrollable cards.
 - Data access: server components call `features/analytics/queries.ts` (`"use cache"`, `cacheLife("minutes")`, `cacheTag("analytics")`). The date range lives in `searchParams`, and KPI deltas are computed in SQL.
 - The Overview page (`/admin`) reuses the KPI tiles (7 days) plus the latest enquiries.
 
-## 3. Build order
+## 3. Build order (all done: #15, #16, #17)
 
 1. Beacon + ingest + bot filter + source classifier (with unit tests for the classifier).
 2. KPI tiles + time series from raw events.

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { KpiGrid } from "@/components/admin/analytics/kpi-grid";
+import { getDashboard } from "@/features/analytics/queries";
+import { resolveRange } from "@/features/analytics/range";
 import { sectionState } from "@/features/pages/admin";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
@@ -26,6 +29,9 @@ export default async function AdminOverview() {
     }),
   ]);
   const drafts = sections.filter((s) => sectionState(s).dirty).length;
+  const now = new Date();
+  const week = resolveRange({ range: "7d" }, now);
+  const analytics = await getDashboard(week.from, week.to, week.previous.from, week.previous.to, now.toISOString().slice(0, 10));
 
   const tiles = [
     { label: "Unread enquiries", value: unread, href: "/admin/inbox", hot: unread > 0 },
@@ -64,9 +70,17 @@ export default async function AdminOverview() {
           </li>
         ))}
       </ul>
-      <p className="text-sm text-muted-foreground">
-        Analytics (visitors, plays, AI referrals) arrive with issues #15–#17.
-      </p>
+      <section aria-labelledby="week-title" className="space-y-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 id="week-title" className="label text-smoke">
+            Last 7 days
+          </h2>
+          <Link href="/admin/analytics" className="label text-smoke hover:text-ivory">
+            Full analytics →
+          </Link>
+        </div>
+        <KpiGrid data={analytics} />
+      </section>
     </div>
   );
 }

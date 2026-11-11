@@ -28,7 +28,7 @@ export function About({ media, heading, body, capabilities, cta, tone }: Section
             <RichText text={heading} />
           </h2>
           <p className="mt-5 max-w-md text-[0.95rem] leading-relaxed text-muted-foreground">{body}</p>
-          <a href={cta.href} className="link-cut mt-8">
+          <a href={cta.href} data-cta="about" className="link-cut mt-8">
             {cta.label} <span aria-hidden>—</span>
           </a>
         </div>

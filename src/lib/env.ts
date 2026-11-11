@@ -31,6 +31,8 @@ const schema = z.object({
 
   // Analytics
   ANALYTICS_SALT: z.string().min(16).optional(),
+  /** Bearer token Vercel Cron sends to /api/cron/* (the route is closed while unset). */
+  CRON_SECRET: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(16).optional()),
 
   // Asset storage. Provider-specific vars are checked by each adapter (pnpm media:check),
   // so only the selectors are validated here. See src/features/media/providers.

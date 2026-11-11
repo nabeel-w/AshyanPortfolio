@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { z } from "zod";
+import { recordServerEvent } from "@/features/analytics/ingest";
 import { db } from "@/lib/db";
 
 export type ContactState =
@@ -48,7 +49,9 @@ export async function submitContact(_prev: ContactState, form: FormData): Promis
     return { status: "error", message: "You've sent a few messages already — I'll be in touch soon." };
   }
 
-  const referer = (await headers()).get("referer");
+  const h = await headers();
+  const referer = h.get("referer");
+  const path = referer ? new URL(referer).pathname : null;
   await db.contactSubmission.create({
     data: {
       name,
@@ -56,9 +59,10 @@ export async function submitContact(_prev: ContactState, form: FormData): Promis
       company,
       budget: projectType, // stored in `budget` until a dedicated column is needed
       message,
-      source: referer ? new URL(referer).pathname : null,
+      source: path,
     },
   });
+  await recordServerEvent({ type: "CONTACT_SUBMIT", path: path ?? "/contact" }, h);
   // TODO(#13): email notification once a mail provider is chosen.
   return { status: "success" };
 }

@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { lazy, Suspense, useState } from "react";
+import { track } from "@/features/analytics/track";
+import { createVideoTracker } from "@/features/analytics/video";
 import { clockDuration } from "@/features/media/delivery";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +27,8 @@ export type FilmPlayerProps = {
  */
 export function FilmPlayer({ playbackId, title, poster, duration, aspectRatio = 16 / 9, priority, className }: FilmPlayerProps) {
   const [started, setStarted] = useState(false);
+  // One tracker per film view: PLAY, then 25/50/75% and COMPLETE (docs/04).
+  const [video] = useState(() => createVideoTracker((m) => track(m.type, "value" in m ? { v: m.value } : {})));
 
   return (
     <div className={cn("relative w-full overflow-hidden bg-ink", className)} style={{ aspectRatio }}>
@@ -40,6 +44,11 @@ export function FilmPlayer({ playbackId, title, poster, duration, aspectRatio = 
             primaryColor="#f4f1ec"
             secondaryColor="#0a0a0a"
             style={{ width: "100%", height: "100%", aspectRatio: String(aspectRatio) }}
+            onPlay={() => video.play()}
+            onTimeUpdate={(e) => {
+              const el = e.target as unknown as { currentTime: number; duration: number };
+              video.time(el.currentTime, el.duration);
+            }}
           />
         </Suspense>
       ) : (

@@ -359,11 +359,13 @@ model AnalyticsEvent {
 
   @@index([createdAt])
   @@index([type, createdAt])
+  @@index([visitorHash, createdAt]) // session lookup on ingest
   @@index([path, createdAt])
   @@index([projectId, createdAt])
 }
 
-/// Nightly rollup so the dashboard never scans raw events for long ranges
+/// Nightly rollup per UTC day and path (path "*" = whole site), so the dashboard never scans
+/// raw events for long ranges. Raw events are kept 90 days. See features/analytics/rollup.ts.
 model AnalyticsDaily {
   id          String   @id @default(cuid())
   day         DateTime @db.Date
@@ -371,12 +373,36 @@ model AnalyticsDaily {
   projectId   String?
   pageviews   Int      @default(0)
   visitors    Int      @default(0)
+  sessions    Int      @default(0)
   videoPlays  Int      @default(0)
+  progress25  Int      @default(0)
+  progress50  Int      @default(0)
+  progress75  Int      @default(0)
   completions Int      @default(0)
+  /// Mean of the furthest milestone (0–100) reached per played session; weight by videoPlays
   avgWatchPct Float?
   ctaClicks   Int      @default(0)
+  /// "*": contact submissions · a path: sessions that viewed it and then enquired
   leads       Int      @default(0)
 
   @@unique([day, path])
   @@index([day])
+}
+
+/// Daily breakdowns: dim = source | referrer | device | country | browser | cta | outbound
+model AnalyticsDailyDim {
+  id        String   @id @default(cuid())
+  day       DateTime @db.Date
+  dim       String
+  key       String
+  visitors  Int      @default(0)
+  sessions  Int      @default(0)
+  pageviews Int      @default(0)
+  plays     Int      @default(0)
+  leads     Int      @default(0)
+  /// cta / outbound only
+  clicks    Int      @default(0)
+
+  @@unique([day, dim, key])
+  @@index([day, dim])
 }

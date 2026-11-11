@@ -5,7 +5,7 @@ Tracked as GitHub issues, labelled `phase-1` … `phase-6`, plus `decision` for 
 | Phase | Issues |
 |---|---|
 | 1 · Data | #2 Neon + migration + seed · #3 cached content queries · #4 project pages |
-| 2 · Media | #5 media adapter + uploads · #6 media library · #7 VideoLoop / FilmPlayer |
+| 2 · Media | #5 media adapter + uploads · #6 media library · #7 VideoLoop / FilmPlayer · #22 Google Drive + YouTube import, upload modal |
 | 3 · Editor | #8 preview route + bridge · #9 3-pane editor · #10 publish + revisions |
 | 4 · Admin | #11 projects · #12 client logos · #13 contact + inbox · #14 settings |
 | 5 · Analytics | #15 collection · #16 rollups · #17 dashboard |
@@ -18,7 +18,7 @@ Tracked as GitHub issues, labelled `phase-1` … `phase-6`, plus `decision` for 
 | **2 · Media** | Pick storage (docs/03), `features/media` adapter, Media library UI, direct uploads, blur/dominant colour, Mux webhook, `VideoLoop` + `FilmPlayer` | ✅ Done (#5, #6, #7) — Mux + Vercel Blob live |
 | **3 · Visual editor** | `/preview/[slug]`, 3-pane editor, schema-driven inspector, dnd reorder, autosave, publish + revisions, device toggles | ✅ Done (#8, #9, #10) |
 | **4 · Projects, Clients, Inbox, Settings** | CRUD screens, contact form + email notification, marquee logo management | ✅ Done except the email notification (#13 open) |
-| **5 · Analytics** | Beacon, ingest, rollups, dashboard (docs/04) | |
+| **5 · Analytics** | Beacon, ingest, rollups, dashboard (docs/04) | ✅ Done (#15, #16, #17) — set `CRON_SECRET` + `ANALYTICS_SALT` on Vercel at launch |
 | **6 · Polish & launch** | Reveal animations, Lenis, CUTLINE-style intro, OG images ✅, VideoObject JSON-LD ✅, Lighthouse pass on mobile, real content, replace `public/media` stand-ins with real stills, domain + Vercel deploy | |
 
 ## Open questions for the client

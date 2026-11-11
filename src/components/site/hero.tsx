@@ -40,7 +40,7 @@ export function Hero({ eyebrow, headline, cta, media }: SectionProps<"hero">) {
           <RichText text={headline} />
         </h1>
         <div className="mt-10 flex items-end justify-between gap-6 md:mt-14">
-          <a href={cta.href} className="link-cut text-ivory">
+          <a href={cta.href} data-cta="hero" className="link-cut text-ivory">
             {cta.label}
             <span aria-hidden>—</span>
           </a>
