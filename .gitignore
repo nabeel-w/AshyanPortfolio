@@ -50,3 +50,6 @@ next-env.d.ts
 
 # local media provider (dev uploads)
 /public/uploads/
+
+# test coverage
+/coverage/

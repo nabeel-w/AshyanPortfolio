@@ -26,6 +26,7 @@ pnpm db:deploy      # apply committed migrations (prod/CI)
 pnpm db:seed        # tsx prisma/seed.ts: site settings + home sections (idempotent)
 pnpm admin:create <email> "<Name>"   # create/reset an admin; hidden password prompt or ADMIN_PASSWORD env
 pnpm media:check    # storage routing, missing env per provider, live credential ping
+pnpm test           # Vitest: unit (node) + components (jsdom) · test:watch · test:unit · test:components · test:coverage
 pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after deleting .next
 ```
 
@@ -78,6 +79,15 @@ pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after 
 | "Zylitch — cursor, blade instead of square" | zylitch-next.vercel.app (repo humairaambreen/zylitch) | Custom cursor that follows direction (`atan2`) and leaves a paw-print trail in a fixed container. GSAP Flip + Lenis. Pink theme (not used). |
 
 Client follow-ups: palette must be **black/white/red**, feel **luxury**, mobile pathways planned explicitly. Stand-in imagery (7 stills: hero, 5 work covers, studio) was generated in ChatGPT through the user's browser session and saved as WebP in `public/media/`. Prompt recipe: "Cinematic film still, landscape 16:9, palette strictly black, white and deep cinema red (red only as a small accent), high contrast, subtle 35mm grain, anamorphic, luxury. No text, no logos, no watermark." Scripted downloads (fetch the img blob, then click an anchor) land in ~/Downloads after a few seconds. The Selected Work section uses the ink tone (the ivory version looked off).
+
+## Testing (Vitest 5)
+
+- `vitest.config.mts` defines two projects: **unit** (node, `src/**/*.test.ts`, setup `test/setup.unit.ts`) and **components** (jsdom, `src/**/*.test.tsx`, setup `test/setup.dom.ts`). Tests sit next to the code they cover. Anything needing DOM APIs (XHR, File) uses `.test.tsx`.
+- Vite 8 resolves `@/` with `resolve.tsconfigPaths: true` (no plugin). `server-only` is aliased to `test/stubs/empty.ts`. `next/cache` is mocked in unit setup and `next/image` is a plain `<img>` in DOM setup, with `preload` / `quality` / `fill` exposed as `data-*` attributes for assertions. `test/dom-utils.ts` has `mockMatchMedia`.
+- Mock Prisma with `vi.hoisted` + `vi.mock("@/lib/db", …)`, then `await import()` the module under test. Config sets `clearMocks`, `restoreMocks`, `unstubEnvs` and `unstubGlobals`, so `vi.stubEnv`/`vi.stubGlobal` are per-test.
+- **Async Server Components can't be rendered in Vitest** (Next guidance). Test their data through `features/content/queries` and leave rendering to E2E.
+- Coverage is ~70% lines (2026-11-11). Untested: Better Auth wiring, the Vercel Blob and Cloudflare Stream upload calls (need live accounts), and async layouts. The tests were mutation-checked: breaking the open-redirect guard, JSON-LD escaping or the webhook replay window each fails a test.
+- Local-route tests write to `public/uploads/test-vitest/` and clean up after themselves.
 
 ## Testing tips
 

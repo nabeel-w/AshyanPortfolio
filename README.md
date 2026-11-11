@@ -11,6 +11,7 @@ pnpm db:deploy && pnpm db:seed      # apply migrations, seed settings + home sec
 pnpm admin:create you@example.com "Your Name"   # email must be in ADMIN_EMAILS; password prompt is hidden
 pnpm dev                            # http://localhost:3000 → /login → /admin
 pnpm media:check                    # which storage provider handles what, and what's missing
+pnpm test                           # unit + component tests (Vitest)
 ```
 
 ## Docs
