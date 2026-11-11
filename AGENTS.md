@@ -25,6 +25,7 @@ pnpm db:migrate     # prisma migrate dev (direct connection, see below)
 pnpm db:deploy      # apply committed migrations (prod/CI)
 pnpm db:seed        # tsx prisma/seed.ts: site settings + home sections (idempotent)
 pnpm admin:create <email> "<Name>"   # create/reset an admin; hidden password prompt or ADMIN_PASSWORD env
+pnpm media:check    # storage routing, missing env per provider, live credential ping
 pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after deleting .next
 ```
 
@@ -51,6 +52,8 @@ pnpm exec next typegen   # regenerate route types (LayoutProps/PageProps) after 
 - Route groups: `(site)` is public, static and cached; `(auth)/login`; `admin/*` is private (noindex).
 - **Section system** = the editor's core: `src/features/sections/schemas.ts` (one zod schema per section type) + `registry.tsx` (type → component + `SectionRenderer`). To add a section: schema, then component in `components/site`, then registry entry. DB `Section.data` is the draft and `publishedData` is live.
 - **Content layer** (`src/features/content/`): `queries.ts` holds `getSite`, `getPublishedPage(slug)`, `getPublishedProjects`, `getWorkList`, all `"use cache"` + `cacheTag` + `cacheLife("max")`. `tags.ts` holds the tag names. `invalidate.ts` has `updateTag` helpers that **every admin mutation must call**. Pages read `Section.publishedData`, validated by the zod schemas (invalid sections are skipped with a warning). The work grid and client marquee are hydrated from the `Project`/`Client` tables once they have rows. An empty DB falls back to `src/content/fallback.ts`. DB errors are not swallowed.
+- **Media / storage** (`src/features/media/`, docs/03): provider-agnostic `StorageProvider` adapters (`local` for dev only, `s3` for R2/S3/B2/MinIO, `vercel-blob`, `mux`, `cloudflare-stream`), routed per media kind by `MEDIA_VIDEO_PROVIDER` / `MEDIA_IMAGE_PROVIDER` / `MEDIA_FILE_PROVIDER` (empty means unset; dev falls back to `local`). Browsers upload **directly** to the provider (signed PUT / form POST / Blob token). `service.ts` is the pipeline, `actions.ts` the admin entry points, and `client/upload.ts` gives `uploadFile(file, {onProgress})`. Webhooks at `/api/media/webhooks/<id>` are HMAC-verified with a 5-minute replay window. `Asset.provider` is a **string** (migration `asset_provider_string` cast the old enum in place), so new providers need no migration. Adding one = 1 adapter file + registry + env enum + `.env.example` + `remotePatterns`. Costs for 200 GB are in docs/07.
+- Scripts that import `server-only` modules run as `tsx --conditions=react-server …`. Wrap top-level await in `main()` (tsx compiles `.ts` scripts to CJS), and on Windows use `pathToFileURL` for absolute dynamic imports.
 - Testing auth with curl: Better Auth rejects requests whose `Origin` isn't `BETTER_AUTH_URL` (`INVALID_ORIGIN`), so send `-H "Origin: http://localhost:3000"` even when the server runs on another port.
 - Headline micro-markup: `*italic red serif*`, `**SANS CAPS**` (rendered by `components/site/rich-text.tsx`). Never store HTML.
 - Server Components by default. Client islands only: `blade-cursor`, `timecode`, `mobile-menu`, `login-form`. Keep home-page JS ≤ 40 KB gz.

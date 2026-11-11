@@ -5,6 +5,12 @@ import { z } from "zod";
  * Server env, validated once at boot. Import `env` instead of reading process.env directly.
  * Storage provider keys are optional until a provider is chosen (docs/03-asset-storage.md).
  */
+// Empty string = unset (the .env.example ships blank values). Keep the list in sync with media/providers.
+const mediaProvider = z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.enum(["local", "s3", "vercel-blob", "mux", "cloudflare-stream"]).optional(),
+);
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
@@ -26,16 +32,11 @@ const schema = z.object({
   // Analytics
   ANALYTICS_SALT: z.string().min(16).optional(),
 
-  // Asset storage — fill whichever provider is chosen
-  MUX_TOKEN_ID: z.string().optional(),
-  MUX_TOKEN_SECRET: z.string().optional(),
-  MUX_WEBHOOK_SECRET: z.string().optional(),
-  BLOB_READ_WRITE_TOKEN: z.string().optional(),
-  R2_ACCOUNT_ID: z.string().optional(),
-  R2_ACCESS_KEY_ID: z.string().optional(),
-  R2_SECRET_ACCESS_KEY: z.string().optional(),
-  R2_BUCKET: z.string().optional(),
-  R2_PUBLIC_URL: z.url().optional(),
+  // Asset storage. Provider-specific vars are checked by each adapter (pnpm media:check),
+  // so only the selectors are validated here. See src/features/media/providers.
+  MEDIA_IMAGE_PROVIDER: mediaProvider,
+  MEDIA_VIDEO_PROVIDER: mediaProvider,
+  MEDIA_FILE_PROVIDER: mediaProvider,
 });
 
 export const env = schema.parse(process.env);

@@ -47,3 +47,6 @@ next-env.d.ts
 /.agents/
 /.windsurf/
 /.claude/skills/
+
+# local media provider (dev uploads)
+/public/uploads/

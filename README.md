@@ -10,6 +10,7 @@ cp .env.example .env.local          # fill in Neon + auth values (Prisma CLI rea
 pnpm db:deploy && pnpm db:seed      # apply migrations, seed settings + home sections
 pnpm admin:create you@example.com "Your Name"   # email must be in ADMIN_EMAILS; password prompt is hidden
 pnpm dev                            # http://localhost:3000 → /login → /admin
+pnpm media:check                    # which storage provider handles what, and what's missing
 ```
 
 ## Docs
@@ -23,3 +24,4 @@ pnpm dev                            # http://localhost:3000 → /login → /admi
 | [04 · Analytics dashboard](docs/04-analytics-dashboard.md) | Cookieless tracking and dashboard plan |
 | [05 · SEO & GEO](docs/05-seo-geo.md) | Structured data, llms.txt, performance budgets |
 | [06 · Roadmap](docs/06-roadmap.md) | Phases and open questions |
+| [07 · Storage costs](docs/07-storage-costs.md) | Cost estimate for 200 GB, provider comparison, client markup |

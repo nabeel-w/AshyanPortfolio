@@ -23,16 +23,71 @@ Goal: films start fast and adapt to the viewer's connection, images are tiny and
 
 **Mux for all video, plus Vercel Blob for images and documents** (or R2 if cost or hosting off Vercel matters more).
 
-## Upload & processing pipeline (provider-agnostic)
+Costs for a 200 GB library are worked out in [docs/07-storage-costs.md](07-storage-costs.md).
 
-1. Admin drops a file into the Media library.
-2. A server action (behind `requireAdmin`) asks the provider for a **signed direct-upload URL** and creates an `Asset` row with `status=UPLOADING`.
-3. The browser uploads straight to the provider, with resumable chunks for large video.
-4. Images: on completion, the server generates `width/height`, a 16px **`blurDataUrl`** and the **`dominantColor`** (sharp). These give instant placeholders and zero layout shift.
-5. Video: the Mux webhook `video.asset.ready` sets `status=READY`, `playbackId` and `duration`.
-6. `updateTag("assets")` plus any affected `project:*` tags.
+## The storage module (`src/features/media`), built and provider-agnostic
 
-`features/media/` exposes one interface (`createUpload`, `finalize`, `delete`, `urlFor`), and each provider implements it. `Asset.provider` records where each file lives, so providers can be switched or mixed later.
+```
+features/media/
+├── types.ts            StorageProvider interface, UploadInstruction, ProviderResult
+├── providers/
+│   ├── index.ts        registry + routing (MEDIA_*_PROVIDER) + env checks
+│   ├── local.ts        dev only: public/uploads via signed PUT URLs (zero setup)
+│   ├── s3.ts           any S3-compatible store: Cloudflare R2, AWS S3, Backblaze B2, MinIO
+│   ├── vercel-blob.ts  Vercel Blob client uploads (scoped token)
+│   ├── mux.ts          Mux Direct Uploads + webhook
+│   └── cloudflare-stream.ts  Direct Creator Uploads + webhook
+├── service.ts          createUpload → completeUpload → applyWebhook / deleteAsset
+├── actions.ts          admin Server Actions (requireAdmin + cache invalidation)
+├── client/upload.ts    uploadFile(file, { onProgress }) for the browser
+├── image-meta.ts       sharp: width/height, blurDataUrl, dominantColor
+└── util.ts             mime → kind, keys, size limits, HMAC helpers
+app/api/media/local/[...key]   dev upload receiver (signed + expiring)
+app/api/media/webhooks/[id]    provider webhooks (signature-verified)
+```
+
+**Choosing providers is env-only.** Set `MEDIA_VIDEO_PROVIDER`, `MEDIA_IMAGE_PROVIDER` and optionally `MEDIA_FILE_PROVIDER` (PDF/audio, defaults to the image provider), fill that provider's block in `.env.local`, then run:
+
+```bash
+pnpm media:check   # routing per media type, missing env per provider, live credential check
+```
+
+With nothing set, development uses `local` (no accounts needed). Production refuses to start uploads without a configured provider.
+
+### Pipeline
+
+1. `createUploadAction({ filename, mimeType, bytes })` (admin only) validates type and size, picks the provider for that kind, mints a **direct-upload instruction**, and creates an `Asset` row (`UPLOADING`).
+2. The browser sends the bytes **straight to the provider** (`client/upload.ts`: presigned PUT, form POST, or Vercel Blob token), with progress events. Nothing passes through our functions, so the 4.5 MB body limit doesn't apply.
+3. `completeUploadAction(assetId)` asks the provider what happened. Images become `READY` with `width/height`, a 16px `blurDataUrl` and `dominantColor`. Streaming video usually comes back `PROCESSING`.
+4. The provider webhook (`/api/media/webhooks/mux` or `/cloudflare-stream`) is HMAC-verified (5-minute replay window) and sets `READY` with `playbackId`, `duration`, poster `url`, and `meta.hls` / `meta.animated`.
+5. Cache tags `assets` and `projects` are invalidated.
+
+`Asset.provider` is a plain string (the adapter id), so providers can be mixed (Mux for video, R2 for stills) and new ones need **no migration**.
+
+### Adding a provider (≈ 1 file)
+
+1. Create `src/features/media/providers/<name>.ts` exporting a `StorageProvider`:
+   - `id`, `label`, `kinds`, `requiredEnv`, `setup` (shown by `media:check` when env is missing)
+   - `createUpload({ key, mimeType, bytes, kind })` returns `{ providerKey, upload }`, using one of the `UploadInstruction` strategies (add a new strategy to `client/upload.ts` only if the provider needs one, e.g. tus)
+   - `finalize(providerKey)` returns `ProviderResult`; `delete(providerKey)`
+   - optional: `read` (image analysis), `webhook` (verify + parse), `check` (credential ping)
+2. Add it to the list in `providers/index.ts` and to the `mediaProvider` enum in `src/lib/env.ts`.
+3. Add its env block to `.env.example`, and its CDN host to `images.remotePatterns` in `next.config.ts`.
+4. `pnpm media:check`, then upload a test file from the admin.
+
+Candidates already sketched in docs/07: Bunny Stream (tus uploads with signed headers) and Cloudinary (signed upload preset).
+
+### Provider setup notes
+
+- **S3 / R2**: the bucket needs CORS so browsers can PUT. R2 example:
+  ```json
+  [{ "AllowedOrigins": ["https://ashyanzafar.com", "http://localhost:3000"],
+     "AllowedMethods": ["PUT", "GET", "HEAD"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
+  ```
+  Serve files from a custom domain (`S3_PUBLIC_URL`), not `r2.dev`, in production.
+- **Mux**: webhook URL `<site>/api/media/webhooks/mux`; `MUX_VIDEO_QUALITY=basic` keeps encoding free (docs/07). Direct uploads PUT the whole file; switch to Mux UpChunk if masters exceed a few GB.
+- **Cloudflare Stream**: Direct Creator Uploads accept files up to 200 MB; larger needs a tus strategy.
+- **Vercel Blob**: public store; tokens are scoped to one pathname, content type and size for 15 minutes.
 
 ## Delivery rules (how "instant" stays instant)
 

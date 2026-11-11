@@ -92,15 +92,6 @@ enum AssetKind {
   DOCUMENT
 }
 
-enum AssetProvider {
-  MUX
-  CLOUDFLARE_STREAM
-  BUNNY_STREAM
-  VERCEL_BLOB
-  CLOUDFLARE_R2
-  CLOUDINARY
-}
-
 enum AssetStatus {
   UPLOADING
   PROCESSING
@@ -111,7 +102,8 @@ enum AssetStatus {
 model Asset {
   id           String        @id @default(cuid())
   kind         AssetKind
-  provider     AssetProvider
+  /// Storage adapter id ("mux", "s3", "vercel-blob", "cloudflare-stream", "local"…) — see src/features/media/providers
+  provider     String
   status       AssetStatus   @default(UPLOADING)
   /// Provider-side id (Mux asset id, blob pathname, R2 key…)
   providerKey  String

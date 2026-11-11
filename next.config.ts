@@ -8,8 +8,14 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     // Grainy cinematic stills show artefacts below ~85, so hero/cards request 90.
     qualities: [75, 85, 90],
-    // Add the chosen storage CDN host here (docs/03-asset-storage.md), e.g. image.mux.com, *.public.blob.vercel-storage.com
-    remotePatterns: [{ protocol: "https", hostname: "image.mux.com" }],
+    // Hosts that media providers serve from (src/features/media/providers).
+    remotePatterns: [
+      { protocol: "https", hostname: "image.mux.com" },
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+      { protocol: "https", hostname: "customer-*.cloudflarestream.com" },
+      { protocol: "https", hostname: "*.r2.dev" },
+      ...(process.env.S3_PUBLIC_URL ? [new URL(process.env.S3_PUBLIC_URL)] : []),
+    ],
   },
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts", "motion"],
