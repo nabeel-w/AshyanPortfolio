@@ -1,0 +1,304 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Ashyan Zafar — "Final Cut" design system
+ * Black · White · Cinema Red. Luxury = restraint: sharp corners, hairlines,
+ * big serif type, lots of black space, red used sparingly (< 5% of any screen).
+ * Full rationale: docs/01-design-direction.md
+ */
+
+@theme inline {
+  /* Brand palette */
+  --color-ink: var(--ink);
+  --color-onyx: var(--onyx);
+  --color-graphite: var(--graphite);
+  --color-ivory: var(--ivory);
+  --color-bone: var(--bone);
+  --color-smoke: var(--smoke);
+  --color-red: var(--cinema-red);
+  --color-red-bright: var(--cinema-red-bright);
+  --color-oxblood: var(--oxblood);
+  --color-hairline: var(--hairline);
+
+  /* Type */
+  --font-sans: var(--font-geist);
+  --font-serif: var(--font-instrument-serif);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-instrument-serif);
+
+  /* Fluid display sizes (mobile → desktop) */
+  --text-display: clamp(3.25rem, 1.6rem + 8.2vw, 11rem);
+  --text-display--line-height: 0.9;
+  --text-display--letter-spacing: -0.035em;
+  --text-headline: clamp(2.25rem, 1.4rem + 4vw, 5.5rem);
+  --text-headline--line-height: 0.95;
+  --text-headline--letter-spacing: -0.025em;
+  --text-title: clamp(1.75rem, 1.3rem + 1.8vw, 3rem);
+  --text-title--line-height: 1;
+  --text-label: 0.6875rem;
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.18em;
+
+  --ease-cut: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* shadcn tokens */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* The site is dark-first; :root IS the brand theme. */
+:root {
+  --ink: #0a0a0a;
+  --onyx: #111111;
+  --graphite: #1c1c1c;
+  --ivory: #f4f1ec;
+  --bone: #e9e4dc;
+  --smoke: #8c8984;
+  --cinema-red: #c1121f;
+  --cinema-red-bright: #e3202d;
+  --oxblood: #5c0a10;
+  --hairline: rgb(244 241 236 / 0.12);
+
+  --background: var(--ink);
+  --foreground: var(--ivory);
+  --card: var(--onyx);
+  --card-foreground: var(--ivory);
+  --popover: var(--onyx);
+  --popover-foreground: var(--ivory);
+  --primary: var(--ivory);
+  --primary-foreground: var(--ink);
+  --secondary: var(--graphite);
+  --secondary-foreground: var(--ivory);
+  --muted: var(--graphite);
+  --muted-foreground: var(--smoke);
+  --accent: var(--graphite);
+  --accent-foreground: var(--ivory);
+  --destructive: var(--cinema-red-bright);
+  --border: var(--hairline);
+  --input: rgb(244 241 236 / 0.16);
+  --ring: var(--cinema-red);
+  --chart-1: var(--cinema-red);
+  --chart-2: var(--ivory);
+  --chart-3: #b8b3ab;
+  --chart-4: #6e6b66;
+  --chart-5: var(--oxblood);
+  --radius: 0.375rem;
+  --sidebar: var(--onyx);
+  --sidebar-foreground: var(--ivory);
+  --sidebar-primary: var(--cinema-red);
+  --sidebar-primary-foreground: var(--ivory);
+  --sidebar-accent: var(--graphite);
+  --sidebar-accent-foreground: var(--ivory);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--cinema-red);
+
+  color-scheme: dark;
+}
+
+/* Paper sections (ivory background) — flips the semantic tokens locally. */
+.tone-paper {
+  --background: #f6f5f2;
+  --foreground: var(--ink);
+  --muted-foreground: #5f5c57;
+  --border: rgb(10 10 10 / 0.14);
+  --hairline: rgb(10 10 10 / 0.14);
+  background: var(--background);
+  color: var(--foreground);
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-background font-sans text-foreground;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply min-h-dvh bg-background text-foreground antialiased;
+  }
+  ::selection {
+    background: var(--cinema-red);
+    color: var(--ivory);
+  }
+  :focus-visible {
+    outline: 1px solid var(--cinema-red);
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* Tiny uppercase mono labels — "01 / 04", "BRAND FILM · 2024" */
+  .label {
+    @apply font-mono text-label uppercase;
+  }
+  /* Hairline-underlined text link with a red wipe on hover */
+  .link-cut {
+    @apply relative inline-flex items-center gap-3 pb-1.5 font-mono text-label uppercase;
+    background: linear-gradient(currentColor, currentColor) left bottom / 100% 1px no-repeat;
+  }
+  .link-cut::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 1px;
+    background: var(--cinema-red);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.6s var(--ease-cut);
+  }
+  .link-cut:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  .container-site {
+    @apply mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10;
+  }
+}
+
+@utility marquee {
+  animation: marquee var(--marquee-duration, 40s) linear infinite;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Hide the system cursor only when the blade cursor is mounted on a fine pointer. */
+@media (pointer: fine) {
+  html[data-cursor="blade"],
+  html[data-cursor="blade"] a,
+  html[data-cursor="blade"] button {
+    cursor: none;
+  }
+}
+
+/* Header: transparent over the hero, frosted ink once scrolled (pure CSS scroll timeline). */
+.site-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgb(10 10 10 / 0.88);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--hairline);
+}
+@supports (animation-timeline: scroll()) {
+  .site-header::before {
+    opacity: 0;
+    animation: header-solid linear both;
+    animation-timeline: scroll(root);
+    animation-range: 40px 160px;
+  }
+}
+@keyframes header-solid {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Blade cursor: hover ring + click "cut" */
+.blade-ring {
+  width: 0;
+  height: 0;
+  transition: transform 0.5s var(--ease-out-expo);
+}
+.blade-ring::before {
+  content: "";
+  position: absolute;
+  left: -44px;
+  top: -44px;
+  width: 88px;
+  height: 88px;
+  border-radius: 9999px;
+  border: 1px solid var(--cinema-red);
+  background: rgb(10 10 10 / 0.25);
+  backdrop-filter: blur(2px);
+}
+.blade-ring span {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  font: 500 10px/1 var(--font-jetbrains-mono), monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ivory);
+}
+.blade-cut {
+  position: fixed;
+  z-index: 99;
+  width: 64px;
+  height: 1px;
+  margin-left: -32px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--cinema-red-bright) 20% 80%, transparent);
+  transform: rotate(var(--angle, -35deg)) scaleX(0);
+  animation: blade-cut 0.55s var(--ease-cut) forwards;
+}
+@keyframes blade-cut {
+  40% {
+    transform: rotate(var(--angle, -35deg)) scaleX(1);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--angle, -35deg)) scaleX(1.25) translateY(3px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

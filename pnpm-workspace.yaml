@@ -1,0 +1,8 @@
+# Packages allowed to run install scripts (pnpm blocks them by default).
+allowBuilds:
+  "@prisma/engines": true
+  prisma: true
+  "@prisma/client": true
+  sharp: true
+  unrs-resolver: true
+  esbuild: true

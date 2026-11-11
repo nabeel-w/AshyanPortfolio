@@ -1,0 +1,378 @@
+// Ashyan Zafar — portfolio data model
+// Docs: docs/02-architecture.md (content + editor), docs/04-analytics-dashboard.md (analytics tables)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auth (Better Auth core schema + `role`)
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(EDITOR)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Assets — one row per uploaded file, provider-agnostic
+// ─────────────────────────────────────────────────────────────
+
+enum AssetKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+enum AssetProvider {
+  MUX
+  CLOUDFLARE_STREAM
+  BUNNY_STREAM
+  VERCEL_BLOB
+  CLOUDFLARE_R2
+  CLOUDINARY
+}
+
+enum AssetStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  ERRORED
+}
+
+model Asset {
+  id           String        @id @default(cuid())
+  kind         AssetKind
+  provider     AssetProvider
+  status       AssetStatus   @default(UPLOADING)
+  /// Provider-side id (Mux asset id, blob pathname, R2 key…)
+  providerKey  String
+  /// Streaming id (Mux playback id / Stream uid) — videos only
+  playbackId   String?
+  /// Direct CDN URL for images / documents
+  url          String?
+  filename     String
+  mimeType     String
+  bytes        Int?
+  width        Int?
+  height       Int?
+  /// Seconds — video/audio only
+  duration     Float?
+  /// Tiny base64 placeholder for instant paint (next/image placeholder="blur")
+  blurDataUrl  String?
+  /// Hex used as background while media loads
+  dominantColor String?
+  alt          String        @default("")
+  caption      String?
+  /// Free-form provider metadata (renditions, aspect ratio, captions track ids…)
+  meta         Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  projectCovers   Project[] @relation("ProjectCover")
+  projectFilms    Project[] @relation("ProjectFilm")
+  projectLoops    Project[] @relation("ProjectLoop")
+  projectGallery  ProjectMedia[]
+  clientLogos     Client[]
+
+  @@unique([provider, providerKey])
+  @@index([kind, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Work
+// ─────────────────────────────────────────────────────────────
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  order    Int       @default(0)
+  projects Project[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  /// e.g. "Brand Film", "Commercial"
+  format      String?
+  clientName  String?
+  year        Int?
+  role        String?       // "Edit · Colour · Sound"
+  summary     String?       // ≤ 160 chars — doubles as meta description
+  /// Rich body blocks (same block schema as page sections)
+  body        Json?
+  credits     Json?         // [{ role, name }]
+  featured    Boolean       @default(false)
+  order       Int           @default(0)
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  categoryId  String?
+  category    Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  coverId     String?
+  cover       Asset?        @relation("ProjectCover", fields: [coverId], references: [id], onDelete: SetNull)
+  /// Full-length film (HLS)
+  filmId      String?
+  film        Asset?        @relation("ProjectFilm", fields: [filmId], references: [id], onDelete: SetNull)
+  /// Short muted loop for hover previews on the grid
+  loopId      String?
+  loop        Asset?        @relation("ProjectLoop", fields: [loopId], references: [id], onDelete: SetNull)
+
+  gallery     ProjectMedia[]
+
+  seoTitle       String?
+  seoDescription String?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status, featured, order])
+}
+
+model ProjectMedia {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assetId   String
+  asset     Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  order     Int     @default(0)
+
+  @@index([projectId, order])
+}
+
+/// Logos for the rotating client marquee
+model Client {
+  id      String  @id @default(cuid())
+  name    String
+  url     String?
+  logoId  String?
+  logo    Asset?  @relation(fields: [logoId], references: [id], onDelete: SetNull)
+  order   Int     @default(0)
+  visible Boolean @default(true)
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pages & sections — the visual, section-wise editor
+// Draft lives in `data`; publishing copies it to `publishedData`.
+// The public site only ever reads `publishedData`.
+// ─────────────────────────────────────────────────────────────
+
+model Page {
+  id             String        @id @default(cuid())
+  slug           String        @unique // "home", "about", "contact"
+  title          String
+  seoTitle       String?
+  seoDescription String?
+  ogImageUrl     String?
+  status         PublishStatus @default(DRAFT)
+  publishedAt    DateTime?
+  sections       Section[]
+  revisions      PageRevision[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Section {
+  id            String   @id @default(cuid())
+  pageId        String
+  page          Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  /// Discriminator — must match a key in src/features/sections/registry.ts
+  type          String
+  order         Int      @default(0)
+  visible       Boolean  @default(true)
+  /// Draft props (validated by the section's zod schema)
+  data          Json
+  /// Live props — null until first publish
+  publishedData Json?
+  updatedAt     DateTime @updatedAt
+
+  @@index([pageId, order])
+}
+
+/// Snapshot of a page's sections on every publish — enables one-click rollback
+model PageRevision {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  snapshot  Json
+  authorId  String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([pageId, createdAt])
+}
+
+/// Single row (id = "site")
+model SiteSettings {
+  id            String   @id @default("site")
+  name          String   @default("Ashyan Zafar")
+  role          String   @default("Film Editor")
+  tagline       String?
+  location      String?
+  email         String?
+  socials       Json?    // [{ label, url }]
+  /// Short factual bio used for llms.txt + Person JSON-LD (GEO)
+  bio           String?
+  availability  String?
+  updatedAt     DateTime @updatedAt
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  budget    String?
+  message   String
+  source    String?  // page path / utm
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([read, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// First-party analytics (cookieless) — see docs/04-analytics-dashboard.md
+// ─────────────────────────────────────────────────────────────
+
+enum EventType {
+  PAGEVIEW
+  VIDEO_PLAY
+  VIDEO_PROGRESS   // value = 25 | 50 | 75 | 100
+  VIDEO_COMPLETE
+  PROJECT_OPEN
+  CTA_CLICK
+  CONTACT_SUBMIT
+  OUTBOUND_CLICK
+}
+
+enum TrafficSource {
+  DIRECT
+  SEARCH
+  AI        // chatgpt.com, perplexity.ai, claude.ai, gemini… (GEO)
+  SOCIAL
+  REFERRAL
+  EMAIL
+  PAID
+}
+
+model AnalyticsEvent {
+  id          String        @id @default(cuid())
+  type        EventType
+  /// Daily-rotating salted hash of ip+ua — no cookies, no PII
+  visitorHash String
+  sessionHash String
+  path        String
+  projectId   String?
+  value       Float?
+  label       String?
+  referrer    String?
+  source      TrafficSource @default(DIRECT)
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  country     String?
+  device      String?       // mobile | tablet | desktop
+  browser     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([path, createdAt])
+  @@index([projectId, createdAt])
+}
+
+/// Nightly rollup so the dashboard never scans raw events for long ranges
+model AnalyticsDaily {
+  id          String   @id @default(cuid())
+  day         DateTime @db.Date
+  path        String
+  projectId   String?
+  pageviews   Int      @default(0)
+  visitors    Int      @default(0)
+  videoPlays  Int      @default(0)
+  completions Int      @default(0)
+  avgWatchPct Float?
+  ctaClicks   Int      @default(0)
+  leads       Int      @default(0)
+
+  @@unique([day, path])
+  @@index([day])
+}
