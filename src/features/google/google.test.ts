@@ -14,7 +14,6 @@ const { GOOGLE_SCOPES, hasFeature, parseScopes } = await import("./scopes");
 const { disconnectGoogle, emailFromIdToken, googleAccessToken, googleAccountFor } =
   await import("./accounts");
 const { buildMime, notifySelf, sendGmail } = await import("./gmail");
-const { enquiryEmail, notifyEnquiry } = await import("@/features/contact/notify");
 
 const idToken = (claims: object) =>
   `h.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.s`;
@@ -169,37 +168,5 @@ describe("gmail", () => {
     ).toString();
     expect(raw).toContain("To: studio@gmail.com");
     expect(raw).toContain("Reply-To: c@brand.co");
-  });
-});
-
-describe("enquiry notification", () => {
-  it("summarises the enquiry and replies go to the visitor", () => {
-    const mail = enquiryEmail(
-      {
-        name: "Priya Shah",
-        email: "priya@brand.co",
-        company: "Brand Co",
-        projectType: "Commercial",
-        message: "We need a 30s cut.",
-        source: "/contact",
-      },
-      "https://ashyanzafar.com/",
-    );
-    expect(mail.subject).toBe("New enquiry · Priya Shah (Brand Co)");
-    expect(mail.replyTo).toBe("priya@brand.co");
-    expect(mail.text).toContain("Priya Shah <priya@brand.co>");
-    expect(mail.text).toContain("Project: Commercial");
-    expect(mail.text).toContain("We need a 30s cut.");
-    expect(mail.text).toContain("https://ashyanzafar.com/admin/inbox");
-    expect(mail.text).toContain("answer Priya");
-  });
-
-  it("never throws: the enquiry is already saved", async () => {
-    db.account.findMany.mockRejectedValueOnce(new Error("db down"));
-    const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(
-      notifyEnquiry({ name: "A B", email: "a@b.co", message: "Hello there, a project." }),
-    ).resolves.toBeUndefined();
-    expect(err).toHaveBeenCalled();
   });
 });

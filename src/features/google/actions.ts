@@ -11,6 +11,9 @@ import {
   listGoogleAccounts,
   pickerConfigured,
 } from "./accounts";
+import { enquiryConfirmation, enquiryNotification } from "@/features/contact/emails";
+import { getSite } from "@/features/content/queries";
+import { SITE_URL } from "@/lib/site-url";
 import { sendGmail } from "./gmail";
 import type { GoogleStatus } from "./scopes";
 
@@ -44,15 +47,41 @@ export async function disconnectGoogleAction(accountId: string) {
   await disconnectGoogle(z.string().min(1).max(100).parse(accountId), session.user.id);
 }
 
-/** Proves the Gmail connection end to end: a short email from the mailbox to itself. */
+/**
+ * Proves the Gmail connection end to end and previews both branded templates: the "new enquiry"
+ * notification and the visitor confirmation, filled with sample data, sent to the mailbox itself.
+ */
 export async function sendTestEmailAction(): Promise<{ to: string }> {
   const session = await requireAdmin();
   const account = await googleAccountFor("gmail", session.user.id);
   if (!account?.email) throw new Error("Connect Gmail first.");
-  await sendGmail(account.id, {
-    to: account.email,
-    subject: "Test notification · Ashyan Zafar site",
-    text: "This is a test from Admin → Settings → Notifications.\n\nNew enquiries from the contact form will arrive like this, with Reply-To set to the sender.",
-  });
+  const site = await getSite();
+  const emailSite = { ...site, url: SITE_URL };
+  const sample = {
+    name: "Priya Shah",
+    email: account.email,
+    company: "Northlight Films",
+    projectType: "Commercial",
+    message:
+      "Hi Ashyan, we are cutting a 60s spot for a spring launch and love the pacing in your reel. Shoot wraps on the 20th; could you take the offline edit?\n\nThis is a test enquiry from Admin → Settings.",
+    source: "/contact",
+  };
+  const toUs = enquiryNotification(sample, emailSite);
+  const toThem = enquiryConfirmation(sample, emailSite);
+  await sendGmail(
+    account.id,
+    {
+      ...toUs,
+      subject: `[Test] ${toUs.subject}`,
+      to: account.email,
+      fromName: `${sample.name} via ${site.name}`,
+    },
+    account.email,
+  );
+  await sendGmail(
+    account.id,
+    { ...toThem, subject: `[Test] ${toThem.subject}`, to: account.email, fromName: site.name },
+    account.email,
+  );
   return { to: account.email };
 }

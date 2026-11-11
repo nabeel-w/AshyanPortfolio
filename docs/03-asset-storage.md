@@ -148,9 +148,21 @@ Each provider owns its server-side write through the optional `StorageProvider.i
 
 **Watch-outs:** `drive.file` covers the picked *files* only (picking a folder grants nothing, so folders can't be selected). Google-native Docs/Sheets/Slides have no binary content and are rejected. Very large or popular files can hit Drive's `downloadQuotaExceeded`, which shows as an error with Retry. On Vercel preview deployments with Deployment Protection, set `VERCEL_AUTOMATION_BYPASS_SECRET` so import runs can call their own route.
 
-### Gmail notifications (#13)
+### Gmail notifications and confirmations (#13)
 
-`features/google/gmail.ts` sends through the Gmail API (`users.me.messages.send`, a raw RFC 5322 message with header-injection-safe headers and RFC 2047 subjects) from the linked mailbox. `submitContact` saves the enquiry, then in `after()` emails **the connected mailbox itself** with `Reply-To` set to the visitor (`features/contact/notify.ts`). Failures are logged and never affect the visitor, since the enquiry is already in Admin → Inbox. Connect, test and disconnect in **Settings → Connected services**.
+`features/google/gmail.ts` sends through the Gmail API (`users.me.messages.send`) from the linked mailbox. Messages are raw RFC 5322, multipart/alternative (text + HTML), with header-injection-safe headers and RFC 2047 subjects. After `submitContact` saves an enquiry, `after()` runs `notifyEnquiry` (`features/contact/notify.ts`). It sends two branded emails in the site's look (`features/contact/emails.ts`: AZ monogram, ink/onyx, serif headline with a red italic accent, mono labels, hairlines):
+
+- **To us** ("New enquiry from *Priya Shah*"): every field, the received time, and **Reply** (mailto) and **Open inbox** buttons. From shows "Priya Shah via Ashyan Zafar"; Reply-To is the visitor.
+- **To the visitor** ("Thank you, *Priya*."): a copy of what they sent, a note that we'll reply soon, and a link to the work. Reply-To is the public contact email.
+
+Anyone can type someone else's address into the form, so the confirmation is guarded:
+
+- the per-address limit (3 per 10 min);
+- a site-wide cap of 100 confirmations per 24 h;
+- echoed text clipped to 2,000 characters;
+- links in the echo defanged with zero-width spaces, so our mailbox never delivers clickable spam.
+
+Failures are logged and never affect the visitor, since the enquiry is already in Admin → Inbox. **Settings → Connected services → Send test email** sends both templates (with sample data) to the mailbox as a preview.
 
 ### Google Cloud Console setup (one-time, owner's Google account)
 
