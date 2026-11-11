@@ -1,4 +1,5 @@
 import { getSite } from "@/features/content/queries";
+import { SocialIcon } from "./social-icon";
 
 export async function SiteFooter() {
   const site = await getSite();
@@ -15,9 +16,11 @@ export async function SiteFooter() {
                 href={s.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="label inline-flex min-h-11 items-center text-ivory/70 transition-colors hover:text-red"
+                aria-label={s.label}
+                className="label inline-flex min-h-11 items-center gap-2 text-ivory/70 transition-colors hover:text-red"
               >
-                {s.label}
+                <SocialIcon href={s.href} />
+                <span className="hidden sm:inline">{s.label}</span>
               </a>
             </li>
           ))}

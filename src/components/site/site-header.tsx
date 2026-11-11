@@ -27,7 +27,7 @@ export async function SiteHeader() {
           </ul>
         </nav>
 
-        <MobileMenu items={site.nav} email={site.email} />
+        <MobileMenu items={site.nav} email={site.email} socials={site.socials} />
       </div>
     </header>
   );

@@ -1,8 +1,12 @@
 import { MediaLibrary } from "@/components/admin/media-library";
 import { toAssetSummary } from "@/features/media/summary";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/session";
 
 export default async function AdminMediaPage() {
+  // Each page segment can be rendered/prefetched on its own (partial prefetching), so it must
+  // authorize itself rather than rely on the layout guard. Also makes the page request-time.
+  await requireAdmin();
   const assets = await db.asset.findMany({
     where: { status: { not: "UPLOADING" } },
     orderBy: { createdAt: "desc" },

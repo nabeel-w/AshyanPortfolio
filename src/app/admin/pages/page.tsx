@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { listPagesForAdmin } from "@/features/pages/admin";
+import { requireAdmin } from "@/lib/session";
 
 export default async function AdminPagesList() {
+  // Each page segment can be rendered/prefetched on its own (partial prefetching), so it must
+  // authorize itself rather than rely on the layout guard. Also makes the page request-time.
+  await requireAdmin();
   const pages = await listPagesForAdmin();
   return (
     <div className="space-y-8">
@@ -10,8 +14,8 @@ export default async function AdminPagesList() {
         <p className="label text-smoke">Content</p>
         <h1 className="font-serif text-4xl text-ivory">Pages</h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Every page is a stack of sections. Edit the text and images with a live preview; changes stay in draft until you
-          publish the page.
+          Every page is a stack of sections. Edit the text and images with a live preview; changes
+          stay in draft until you publish the page.
         </p>
       </header>
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -27,7 +31,11 @@ export default async function AdminPagesList() {
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
                 <Badge variant="secondary">{p.sections} sections</Badge>
-                {p.pendingChanges ? <Badge variant="outline">{p.pendingChanges} unpublished</Badge> : <Badge variant="outline">Live</Badge>}
+                {p.pendingChanges ? (
+                  <Badge variant="outline">{p.pendingChanges} unpublished</Badge>
+                ) : (
+                  <Badge variant="outline">Live</Badge>
+                )}
               </div>
             </Link>
           </li>

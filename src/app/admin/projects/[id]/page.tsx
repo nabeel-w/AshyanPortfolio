@@ -2,12 +2,22 @@ import { notFound } from "next/navigation";
 import { ProjectForm } from "@/components/admin/project-form";
 import { toAssetSummary } from "@/features/media/summary";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/session";
 
 export default async function EditProjectPage({ params }: PageProps<"/admin/projects/[id]">) {
+  // Each page segment can be rendered/prefetched on its own (partial prefetching), so it must
+  // authorize itself rather than rely on the layout guard. Also makes the page request-time.
+  await requireAdmin();
   const { id } = await params;
   const p = await db.project.findUnique({
     where: { id },
-    include: { cover: true, film: true, loop: true, category: true, gallery: { include: { asset: true }, orderBy: { order: "asc" } } },
+    include: {
+      cover: true,
+      film: true,
+      loop: true,
+      category: true,
+      gallery: { include: { asset: true }, orderBy: { order: "asc" } },
+    },
   });
   if (!p) notFound();
   const credits = Array.isArray(p.credits) ? (p.credits as { role: string; name: string }[]) : [];

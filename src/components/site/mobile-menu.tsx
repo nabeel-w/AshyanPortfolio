@@ -3,9 +3,18 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SocialIcon } from "./social-icon";
 
 /** Full-screen serif menu for < md. Large tap targets, closes on navigation and Escape. */
-export function MobileMenu({ items, email }: { items: { label: string; href: string }[]; email: string }) {
+export function MobileMenu({
+  items,
+  email,
+  socials = [],
+}: {
+  items: { label: string; href: string }[];
+  email: string;
+  socials?: { label: string; href: string }[];
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -55,9 +64,28 @@ export function MobileMenu({ items, email }: { items: { label: string; href: str
             ))}
           </ul>
         </nav>
-        <a href={`mailto:${email}`} className="link-cut self-start text-ivory">
-          {email}
-        </a>
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <a href={`mailto:${email}`} className="link-cut self-start text-ivory">
+            {email}
+          </a>
+          {socials.length ? (
+            <ul className="flex gap-2">
+              {socials.map((s) => (
+                <li key={s.label}>
+                  <a
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={s.label}
+                    className="grid size-11 place-items-center rounded-full border border-hairline text-ivory/80 hover:border-red hover:text-red"
+                  >
+                    <SocialIcon href={s.href} className="size-4" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       </div>
     </div>
   );

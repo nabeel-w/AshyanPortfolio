@@ -19,6 +19,7 @@ export const site = {
     { label: "Instagram", href: "https://instagram.com/" },
     { label: "Vimeo", href: "https://vimeo.com/" },
     { label: "LinkedIn", href: "https://linkedin.com/" },
+    { label: "YouTube", href: "https://youtube.com/" },
   ],
   nav: [
     { label: "Home", href: "/" },

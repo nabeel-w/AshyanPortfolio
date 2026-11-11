@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { sectionState } from "@/features/pages/admin";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/session";
 
 export default async function AdminOverview() {
+  // Each page segment can be rendered/prefetched on its own (partial prefetching), so it must
+  // authorize itself rather than rely on the layout guard. Also makes the page request-time.
+  await requireAdmin();
   const [projects, published, assets, processing, unread, clients, sections] = await Promise.all([
     db.project.count(),
     db.project.count({ where: { status: "PUBLISHED" } }),
@@ -11,7 +15,14 @@ export default async function AdminOverview() {
     db.contactSubmission.count({ where: { read: false } }),
     db.client.count({ where: { visible: true } }),
     db.section.findMany({
-      select: { data: true, publishedData: true, order: true, publishedOrder: true, visible: true, publishedVisible: true },
+      select: {
+        data: true,
+        publishedData: true,
+        order: true,
+        publishedOrder: true,
+        visible: true,
+        publishedVisible: true,
+      },
     }),
   ]);
   const drafts = sections.filter((s) => sectionState(s).dirty).length;
@@ -19,8 +30,18 @@ export default async function AdminOverview() {
   const tiles = [
     { label: "Unread enquiries", value: unread, href: "/admin/inbox", hot: unread > 0 },
     { label: "Unpublished page changes", value: drafts, href: "/admin/pages", hot: drafts > 0 },
-    { label: "Published projects", value: `${published}/${projects}`, href: "/admin/projects", hot: false },
-    { label: "Media files", value: processing ? `${assets} (+${processing})` : assets, href: "/admin/media", hot: false },
+    {
+      label: "Published projects",
+      value: `${published}/${projects}`,
+      href: "/admin/projects",
+      hot: false,
+    },
+    {
+      label: "Media files",
+      value: processing ? `${assets} (+${processing})` : assets,
+      href: "/admin/media",
+      hot: false,
+    },
     { label: "Clients in marquee", value: clients, href: "/admin/clients", hot: false },
   ];
 
@@ -43,7 +64,9 @@ export default async function AdminOverview() {
           </li>
         ))}
       </ul>
-      <p className="text-sm text-muted-foreground">Analytics (visitors, plays, AI referrals) arrive with issues #15–#17.</p>
+      <p className="text-sm text-muted-foreground">
+        Analytics (visitors, plays, AI referrals) arrive with issues #15–#17.
+      </p>
     </div>
   );
 }

@@ -1,7 +1,9 @@
+import { BrandIcon } from "@/components/icons/brand-icons";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import type { SectionProps } from "@/features/sections/schemas";
 import { SITE_URL } from "@/lib/site-url";
 import { ContactForm } from "./contact-form";
+import { SocialIcon } from "./social-icon";
 import { whatsappHref } from "@/lib/whatsapp";
 
 /** Contact details that live in Site settings (not per-section). */
@@ -78,9 +80,13 @@ export function ContactSection({
                       href={s.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex min-h-11 items-center justify-between text-ivory/80 hover:text-red"
+                      className="flex min-h-11 items-center justify-between gap-3 text-ivory/80 hover:text-red"
                     >
-                      {s.label} <span aria-hidden>↗</span>
+                      <span className="flex items-center gap-3">
+                        <SocialIcon href={s.href} className="size-4" />
+                        {s.label}
+                      </span>
+                      <span aria-hidden>↗</span>
                     </a>
                   </li>
                 ))}
@@ -105,7 +111,7 @@ export function ContactSection({
                 rel="noopener noreferrer"
                 className="label mt-4 inline-flex min-h-10 items-center gap-2 border border-hairline px-4 text-ivory hover:border-red hover:text-red"
               >
-                Ask ChatGPT ↗
+                <BrandIcon brand="chatgpt" className="size-4" /> Ask ChatGPT ↗
               </a>
             </div>
           ) : null}
