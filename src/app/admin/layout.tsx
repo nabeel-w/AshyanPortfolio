@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { SignOutButton } from "@/components/admin/sign-out-button";
+import { Toaster } from "@/components/ui/sonner";
 import { requireAdmin } from "@/lib/session";
+
+// Every admin view reads the session per request, so it is never an instant (prefetched) navigation.
+export const instant = false;
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -10,7 +15,6 @@ export const metadata: Metadata = {
 
 const nav = [
   { href: "/admin", label: "Overview" },
-  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/pages", label: "Pages" },
   { href: "/admin/projects", label: "Projects" },
   { href: "/admin/media", label: "Media" },
@@ -44,9 +48,13 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
                 </Link>
               </li>
             ))}
+            <li className="md:mt-4 md:border-t md:border-border md:pt-4">
+              <SignOutButton />
+            </li>
           </ul>
         </nav>
       </aside>
+      <Toaster position="bottom-right" />
       <div className="min-w-0 flex-1 p-4 md:p-8">
         <Suspense fallback={<div className="h-40 animate-pulse rounded-lg bg-onyx" />}>
           <Guard>{children}</Guard>
