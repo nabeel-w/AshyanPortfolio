@@ -97,6 +97,8 @@
   --bone: #e9e4dc;
   --smoke: #8c8984;
   --cinema-red: #c1121f;
+  /* Small red text on dark tones: cinema red is only 3.2:1 on ink; this is 5.1:1 on ink, 4.9:1 on onyx. */
+  --signal-red: #f23a45;
   --cinema-red-bright: #e3202d;
   --oxblood: #5c0a10;
   --hairline: rgb(244 241 236 / 0.12);
@@ -180,6 +182,16 @@
   .link-cut {
     @apply relative inline-flex items-center gap-3 pb-1.5 font-mono text-label uppercase;
     background: linear-gradient(currentColor, currentColor) left bottom / 100% 1px no-repeat;
+  }
+  /* 44px tap target without changing the look (::after is the red underline wipe). */
+  .link-cut::before,
+  .hit-44::before {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
+  .hit-44 {
+    position: relative;
   }
   .link-cut::after {
     content: "";
@@ -656,4 +668,10 @@ html[data-intro="skip"] .intro {
   .site-header::before {
     animation-duration: auto !important;
   }
+}
+
+/* WCAG AA for the 11px mono labels: on dark tones they use signal red; the paper tone keeps cinema red (5.7:1). */
+.label.text-red:not(.tone-paper *),
+.label .text-red:not(.tone-paper *) {
+  color: var(--signal-red);
 }

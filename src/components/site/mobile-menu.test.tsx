@@ -63,4 +63,29 @@ describe("<MobileMenu>", () => {
     const { toggle } = setup();
     expect(toggle).toHaveClass("min-h-11");
   });
+
+  it("traps focus while open (the page behind is inert) and Escape hands focus back", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <header>
+          <a href="#top">Logo</a>
+          <MobileMenu items={items} email="hello@ashyan.test" />
+        </header>
+        <main>
+          <a href="/x">Behind</a>
+        </main>
+      </>,
+    );
+    const toggle = screen.getByRole("button", { name: "Menu" });
+    await user.click(toggle);
+    expect(screen.getByRole("main").inert).toBe(true);
+    expect(screen.getByText("Logo").inert).toBe(true);
+    expect(screen.getByRole("link", { name: /Work/ }).closest("[inert]")).toBeNull();
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("main").inert).toBe(false);
+    expect(screen.getByText("Logo").inert).toBe(false);
+    expect(toggle).toHaveFocus();
+  });
 });

@@ -32,13 +32,20 @@ export function ContactSection({
     <section aria-label="Contact" className="bg-ink pb-24 md:pb-32">
       <div className="container-site grid gap-16 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <ContactForm projectTypes={projectTypes} submitLabel={submitLabel} successMessage={successMessage} />
+          <ContactForm
+            projectTypes={projectTypes}
+            submitLabel={submitLabel}
+            successMessage={successMessage}
+          />
         </div>
 
         <aside className="space-y-8 border-hairline lg:col-span-4 lg:col-start-9 lg:border-l lg:pl-10">
           {site?.email ? (
             <Detail label="Email">
-              <a href={`mailto:${site.email}`} className="font-serif text-2xl text-ivory hover:text-red">
+              <a
+                href={`mailto:${site.email}`}
+                className="hit-44 font-serif text-2xl text-ivory hover:text-red"
+              >
                 {site.email}
               </a>
             </Detail>
@@ -49,7 +56,7 @@ export function ContactSection({
                 href={whatsappHref(site.whatsapp, site.whatsappMessage)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 font-serif text-2xl text-ivory hover:text-red"
+                className="hit-44 inline-flex items-center gap-3 font-serif text-2xl text-ivory hover:text-red"
               >
                 Chat on WhatsApp <WhatsAppIcon className="size-5" />
               </a>
@@ -58,7 +65,12 @@ export function ContactSection({
           ) : null}
           {bookingUrl ? (
             <Detail label="Book a call">
-              <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className="font-serif text-2xl text-ivory hover:text-red">
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hit-44 font-serif text-2xl text-ivory hover:text-red"
+              >
                 Find a time ↗
               </a>
             </Detail>
@@ -67,7 +79,8 @@ export function ContactSection({
             <Detail label="Location">
               <p className="text-ivory">{location}</p>
               <p className="mt-1 flex items-center gap-2 text-sm text-smoke">
-                <span className="size-1.5 rounded-full bg-red" aria-hidden /> Available remote worldwide
+                <span className="size-1.5 rounded-full bg-red" aria-hidden /> Available remote
+                worldwide
               </p>
             </Detail>
           ) : null}
@@ -96,7 +109,8 @@ export function ContactSection({
           {availability ? (
             <div className="border border-hairline bg-onyx p-5">
               <p className="label flex items-center gap-2 text-red">
-                <span className="size-1.5 animate-pulse rounded-full bg-red" aria-hidden /> Available
+                <span className="size-1.5 animate-pulse rounded-full bg-red" aria-hidden />{" "}
+                Available
               </p>
               <p className="mt-2 text-sm text-ivory/70">{availability}</p>
             </div>
@@ -104,12 +118,14 @@ export function ContactSection({
           {askAi ? (
             <div className="border border-hairline bg-onyx p-5">
               <p className="font-serif text-2xl text-ivory">Not sure I&apos;m the right fit?</p>
-              <p className="mt-1 text-sm text-smoke">Ask an AI assistant about my work — the prompt is ready.</p>
+              <p className="mt-1 text-sm text-smoke">
+                Ask an AI assistant about my work — the prompt is ready.
+              </p>
               <a
                 href={`https://chatgpt.com/?q=${encodeURIComponent(aiPrompt)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="label mt-4 inline-flex min-h-10 items-center gap-2 border border-hairline px-4 text-ivory hover:border-red hover:text-red"
+                className="label mt-4 inline-flex min-h-11 items-center gap-2 border border-hairline px-4 text-ivory hover:border-red hover:text-red"
               >
                 <BrandIcon brand="chatgpt" className="size-4" /> Ask ChatGPT ↗
               </a>

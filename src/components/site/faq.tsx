@@ -18,21 +18,26 @@ export function Faq({ eyebrow, title, items }: SectionProps<"faq">) {
             <RichText text={title} />
           </h2>
         </div>
-        <dl className="divide-y divide-hairline border-y border-hairline lg:col-span-7 lg:col-start-6">
+        {/* Question headings + answer paragraphs (a <dl> can't hold headings or the number column). */}
+        <div className="divide-y divide-hairline border-y border-hairline lg:col-span-7 lg:col-start-6">
           {items.map((item, i) => (
-            <div key={`${item.question}-${i}`} data-reveal className="grid gap-3 py-8 md:grid-cols-[3rem_1fr]">
+            <div
+              key={`${item.question}-${i}`}
+              data-reveal
+              className="grid gap-3 py-8 md:grid-cols-[3rem_1fr]"
+            >
               <span aria-hidden className="label pt-2 text-red tabular-nums">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div>
-                <dt>
-                  <h3 className="font-serif text-2xl leading-snug text-ivory md:text-3xl">{item.question}</h3>
-                </dt>
-                <dd className="mt-3 max-w-2xl leading-relaxed text-ivory/70">{item.answer}</dd>
+                <h3 className="font-serif text-2xl leading-snug text-ivory md:text-3xl">
+                  {item.question}
+                </h3>
+                <p className="mt-3 max-w-2xl leading-relaxed text-ivory/70">{item.answer}</p>
               </div>
             </div>
           ))}
-        </dl>
+        </div>
       </div>
     </section>
   );

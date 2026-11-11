@@ -1,24 +1,35 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { getSite } from "@/features/content/queries";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
 // Type system (from the Taha Seder reference): serif display, grotesk body, mono labels.
-// next/font self-hosts these — no request to Google at runtime, no layout shift.
-const serif = Instrument_Serif({
+// The Latin woff2 files live in ./fonts (SIL OFL 1.1, see fonts/README.md), so builds never fetch from
+// Google and the exact versions are pinned. next/font preloads them and adds size-adjusted fallbacks
+// (no layout shift).
+const serif = localFont({
   variable: "--font-instrument-serif",
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
+  src: [
+    { path: "./fonts/instrument-serif-latin-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/instrument-serif-latin-400-italic.woff2", weight: "400", style: "italic" },
+  ],
   display: "swap",
+  fallback: ["Georgia", "Times New Roman", "serif"],
 });
-const sans = Geist({ variable: "--font-geist", subsets: ["latin"], display: "swap" });
-const mono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+const sans = localFont({
+  variable: "--font-geist",
+  src: "./fonts/geist-latin-var.woff2",
+  weight: "100 900",
   display: "swap",
+  fallback: ["system-ui", "Arial", "sans-serif"],
+});
+const mono = localFont({
+  variable: "--font-jetbrains-mono",
+  src: "./fonts/jetbrains-mono-latin-var.woff2",
+  weight: "400 500",
+  display: "swap",
+  fallback: ["ui-monospace", "Menlo", "Consolas", "monospace"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {

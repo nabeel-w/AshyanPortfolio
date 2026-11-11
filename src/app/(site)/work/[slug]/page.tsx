@@ -69,10 +69,12 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
       <div className="container-site grid gap-12 py-14 md:py-20 lg:grid-cols-12 lg:gap-16">
         <header className="lg:col-span-7">
           <nav aria-label="Breadcrumb" className="label mb-6 text-smoke">
-            <Link href="/work" className="hover:text-ivory">
+            <Link href="/work" className="hit-44 hover:text-ivory">
               Work
             </Link>
-            <span className="mx-2 text-red">/</span>
+            <span aria-hidden className="mx-2 text-red">
+              /
+            </span>
             {p.category}
           </nav>
           <h1 className="font-serif text-headline text-ivory [text-wrap:balance]">{p.title}</h1>

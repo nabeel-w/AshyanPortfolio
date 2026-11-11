@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { SocialIcon } from "./social-icon";
 
@@ -16,21 +16,44 @@ export function MobileMenu({
   socials?: { label: string; href: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      toggle.current?.focus();
+    };
     document.addEventListener("keydown", onKey);
     document.documentElement.style.overflow = "hidden";
+    // Focus trap: everything outside the menu (and its toggle) is inert while it's open,
+    // so Tab and screen readers can't wander into the page underneath.
+    const inerted: HTMLElement[] = [];
+    for (
+      let el: HTMLElement | null = root.current;
+      el && el !== document.body;
+      el = el.parentElement
+    ) {
+      for (const sibling of Array.from(el.parentElement?.children ?? [])) {
+        if (sibling !== el && sibling instanceof HTMLElement && !sibling.inert) {
+          sibling.inert = true;
+          inerted.push(sibling);
+        }
+      }
+    }
     return () => {
       document.removeEventListener("keydown", onKey);
       document.documentElement.style.overflow = "";
+      for (const el of inerted) el.inert = false;
     };
   }, [open]);
 
   return (
-    <div className="md:hidden">
+    <div ref={root} className="md:hidden">
       <button
+        ref={toggle}
         type="button"
         aria-expanded={open}
         aria-controls="mobile-menu"
@@ -45,7 +68,7 @@ export function MobileMenu({
         hidden={!open}
         className={cn(
           "fixed inset-0 z-50 flex flex-col justify-between bg-ink px-4 pt-24 pb-[max(2rem,env(safe-area-inset-bottom))]",
-          open && "animate-in fade-in duration-300",
+          open && "animate-in duration-300 fade-in",
         )}
       >
         <nav aria-label="Mobile">
@@ -57,7 +80,9 @@ export function MobileMenu({
                   onClick={() => setOpen(false)}
                   className="flex min-h-16 items-baseline gap-4 py-3 font-serif text-5xl text-ivory"
                 >
-                  <span className="label text-red tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="label text-red tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                   {item.label}
                 </Link>
               </li>

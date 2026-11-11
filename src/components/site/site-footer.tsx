@@ -17,7 +17,7 @@ export async function SiteFooter() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={s.label}
-                className="label inline-flex min-h-11 items-center gap-2 text-ivory/70 transition-colors hover:text-red"
+                className="label inline-flex min-h-11 min-w-11 items-center justify-center gap-2 text-ivory/70 transition-colors hover:text-red sm:min-w-0 sm:justify-start"
               >
                 <SocialIcon href={s.href} />
                 <span className="hidden sm:inline">{s.label}</span>

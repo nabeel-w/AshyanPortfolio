@@ -56,7 +56,7 @@ export function FilmPlayer({ playbackId, title, poster, duration, aspectRatio = 
           type="button"
           onClick={() => setStarted(true)}
           data-cursor="play"
-          aria-label={`Play film: ${title}${duration ? ` (${clockDuration(duration)})` : ""}`}
+          aria-label={`Play film${duration ? ` · ${clockDuration(duration)}` : ""}: ${title}`}
           className="group absolute inset-0 block size-full text-ivory"
         >
           <Image

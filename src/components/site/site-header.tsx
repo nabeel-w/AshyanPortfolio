@@ -7,7 +7,10 @@ export async function SiteHeader() {
   return (
     <header className="site-header fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)]">
       <div className="container-site flex h-16 items-center justify-between md:h-20">
-        <Link href="/" className="font-sans text-xs font-medium tracking-[0.42em] text-ivory uppercase sm:text-sm">
+        <Link
+          href="/"
+          className="hit-44 font-sans text-xs font-medium tracking-[0.42em] text-ivory uppercase sm:text-sm"
+        >
           {site.name}
         </Link>
 
@@ -17,9 +20,11 @@ export async function SiteHeader() {
               <li key={item.label}>
                 <Link
                   href={item.href}
-                  className="label group flex items-center gap-1.5 text-ivory/70 transition-colors hover:text-ivory"
+                  className="label group hit-44 flex items-center gap-1.5 text-ivory/70 transition-colors hover:text-ivory"
                 >
-                  <span className="text-smoke tabular-nums group-hover:text-red">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="text-smoke tabular-nums group-hover:text-red">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                   {item.label}
                 </Link>
               </li>

@@ -27,7 +27,7 @@ export function WorkFilter({ categories }: { categories: string[] }) {
             aria-pressed={active === c}
             onClick={(e) => select(c, e.currentTarget)}
             className={cn(
-              "label relative inline-block min-h-10 py-2 transition-colors",
+              "label relative inline-block min-h-11 py-2 transition-colors",
               active === c
                 ? "text-foreground after:absolute after:inset-x-0 after:bottom-1 after:h-px after:bg-red"
                 : "text-muted-foreground hover:text-foreground",

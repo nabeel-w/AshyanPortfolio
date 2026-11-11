@@ -13,39 +13,91 @@ import { Statement } from "@/components/site/statement";
 import { WorkGrid } from "@/components/site/work-grid";
 import type { SectionData, SectionProps, SectionType } from "./schemas";
 
+/** Where a section sits on the page. position 0–1 is above the fold on phones: no reveal, LCP priority. */
+/** Rendering context every section receives; `position` drives above-the-fold behaviour (./placement). */
+export type SectionPlacement = { site?: SiteContact; position?: number };
+
 type Registry = {
   [K in SectionType]: {
     label: string;
     description: string;
-    component: ComponentType<SectionProps<K> & { site?: SiteContact }>;
+    component: ComponentType<SectionProps<K> & SectionPlacement>;
   };
 };
 
 /** One entry per section type. The admin editor reads `label`/`description` for its "Add section" menu. */
 export const sectionRegistry: Registry = {
-  hero: { label: "Hero", description: "Full-screen opener with headline and image", component: Hero },
-  pageHeader: { label: "Page header", description: "Eyebrow, big title and intro for inner pages", component: PageHeader },
-  clientMarquee: { label: "Client logos", description: "Rotating logo strip (logos come from Clients)", component: ClientMarquee },
-  workGrid: { label: "Work grid", description: "Films grid with filters (projects come from Projects)", component: WorkGrid },
-  statement: { label: "Statement", description: "Mixed serif / caps manifesto line", component: Statement },
-  about: { label: "About + capabilities", description: "Image, short bio and capabilities list", component: About },
+  hero: {
+    label: "Hero",
+    description: "Full-screen opener with headline and image",
+    component: Hero,
+  },
+  pageHeader: {
+    label: "Page header",
+    description: "Eyebrow, big title and intro for inner pages",
+    component: PageHeader,
+  },
+  clientMarquee: {
+    label: "Client logos",
+    description: "Rotating logo strip (logos come from Clients)",
+    component: ClientMarquee,
+  },
+  workGrid: {
+    label: "Work grid",
+    description: "Films grid with filters (projects come from Projects)",
+    component: WorkGrid,
+  },
+  statement: {
+    label: "Statement",
+    description: "Mixed serif / caps manifesto line",
+    component: Statement,
+  },
+  about: {
+    label: "About + capabilities",
+    description: "Image, short bio and capabilities list",
+    component: About,
+  },
   bio: { label: "Biography", description: "Portrait, key numbers and long bio", component: Bio },
   services: { label: "Services", description: "Numbered “What I do” cards", component: Services },
-  clientList: { label: "Client list", description: "Grouped client names (brands, agencies…)", component: ClientList },
-  contactCta: { label: "Contact CTA", description: "“Let's talk” block with email", component: ContactCta },
-  contactForm: { label: "Contact form", description: "Enquiry form with contact details", component: ContactSection },
-  faq: { label: "Questions & answers", description: "Question-style subheads with short answers (great for search and AI answers)", component: Faq },
+  clientList: {
+    label: "Client list",
+    description: "Grouped client names (brands, agencies…)",
+    component: ClientList,
+  },
+  contactCta: {
+    label: "Contact CTA",
+    description: "“Let's talk” block with email",
+    component: ContactCta,
+  },
+  contactForm: {
+    label: "Contact form",
+    description: "Enquiry form with contact details",
+    component: ContactSection,
+  },
+  faq: {
+    label: "Questions & answers",
+    description: "Question-style subheads with short answers (great for search and AI answers)",
+    component: Faq,
+  },
 };
 
 /** Renders a page's sections in order. Used by the public site AND the admin live preview. */
-export function SectionRenderer({ sections, site }: { sections: SectionData[]; site?: SiteContact }) {
+export function SectionRenderer({
+  sections,
+  site,
+}: {
+  sections: SectionData[];
+  site?: SiteContact;
+}) {
   return sections
     .filter((s) => s.visible)
-    .map((s) => {
-      const Component = sectionRegistry[s.type].component as ComponentType<typeof s.data & { site?: SiteContact }>;
+    .map((s, position) => {
+      const Component = sectionRegistry[s.type].component as ComponentType<
+        typeof s.data & SectionPlacement
+      >;
       return (
         <div key={s.id} data-section-id={s.id} data-section-type={s.type}>
-          <Component {...s.data} site={site} />
+          <Component {...s.data} site={site} position={position} />
         </div>
       );
     });

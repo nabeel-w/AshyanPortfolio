@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { isAboveFold } from "@/features/sections/placement";
 import type { SectionProps } from "@/features/sections/schemas";
 import { VideoLoop } from "@/components/media/video-loop";
 import { WorkFilter } from "./work-filter";
@@ -12,7 +13,14 @@ type Project = SectionProps<"workGrid">["projects"][number];
  * Frames sit on ink with hairline borders; titles live BELOW the frame (serif + mono meta),
  * so the imagery stays clean. Red is only used for the index number, active filter and playhead.
  */
-export function WorkGrid({ label, categories, projects, tone }: SectionProps<"workGrid">) {
+export function WorkGrid({
+  label,
+  categories,
+  projects,
+  tone,
+  position,
+}: SectionProps<"workGrid"> & { position?: number }) {
+  const top = isAboveFold(position);
   return (
     <section
       id="work"
@@ -20,10 +28,14 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
       className={cn("scroll-mt-20 py-20 md:py-32", tone === "paper" ? "tone-paper" : "bg-ink")}
     >
       <div className="container-site">
-        <div data-reveal className="mb-10 flex flex-col gap-6 border-b border-hairline pb-6 md:mb-14 md:flex-row md:items-end md:justify-between">
+        <div
+          data-reveal
+          className="mb-10 flex flex-col gap-6 border-b border-hairline pb-6 md:mb-14 md:flex-row md:items-end md:justify-between"
+        >
           <div>
             <p className="label mb-3 text-muted-foreground tabular-nums">
-              <span className="text-red">●</span> Reel / {String(projects.length).padStart(2, "0")} films
+              <span className="text-red">●</span> Reel / {String(projects.length).padStart(2, "0")}{" "}
+              films
             </p>
             <h2 id="work-title" className="font-serif text-headline">
               {label.split(" ").slice(0, -1).join(" ")}{" "}
@@ -33,7 +45,7 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
           {/* Horizontal-scroll chips on mobile, inline on desktop */}
           <nav
             aria-label="Filter work"
-            className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
+            className="-mx-4 [scrollbar-width:none] overflow-x-auto px-4 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
           >
             <WorkFilter categories={categories} />
           </nav>
@@ -44,9 +56,12 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
             <li
               key={p.slug}
               data-category={p.category}
-              className={cn(i < 2 ? "lg:col-span-3" : "lg:col-span-2", i === 4 && "sm:col-span-2 lg:col-span-2")}
+              className={cn(
+                i < 2 ? "lg:col-span-3" : "lg:col-span-2",
+                i === 4 && "sm:col-span-2 lg:col-span-2",
+              )}
             >
-              <WorkCard project={p} large={i < 2} index={i} />
+              <WorkCard project={p} large={i < 2} index={i} aboveFold={top && i < 2} />
             </li>
           ))}
         </ul>
@@ -55,11 +70,22 @@ export function WorkGrid({ label, categories, projects, tone }: SectionProps<"wo
   );
 }
 
-function WorkCard({ project, large, index }: { project: Project; large: boolean; index: number }) {
+function WorkCard({
+  project,
+  large,
+  index,
+  aboveFold,
+}: {
+  project: Project;
+  large: boolean;
+  index: number;
+  aboveFold: boolean;
+}) {
   return (
     <Link href={`/work/${project.slug}`} data-cursor="play" className="group block">
       <div
-        data-reveal="wipe"
+        // Never hide above-the-fold frames behind the wipe: they're the page's LCP.
+        data-reveal={aboveFold ? undefined : "wipe"}
         style={{ ["--i" as string]: index % 3 }}
         className={cn(
           "relative overflow-hidden border border-hairline bg-onyx",
@@ -77,6 +103,8 @@ function WorkCard({ project, large, index }: { project: Project; large: boolean;
               : "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
           }
           loading={index < 2 ? "eager" : "lazy"}
+          preload={aboveFold && index === 0}
+          fetchPriority={aboveFold && index === 0 ? "high" : undefined}
           quality={90}
           placeholder={project.cover.blurDataUrl ? "blur" : "empty"}
           blurDataURL={project.cover.blurDataUrl}
@@ -93,7 +121,11 @@ function WorkCard({ project, large, index }: { project: Project; large: boolean;
           {project.category}
         </span>
       </div>
-      <div data-reveal style={{ ["--i" as string]: (index % 3) + 2 }} className="mt-4 flex items-start justify-between gap-4">
+      <div
+        data-reveal
+        style={{ ["--i" as string]: (index % 3) + 2 }}
+        className="mt-4 flex items-start justify-between gap-4"
+      >
         <div className="flex items-baseline gap-3">
           <span className="label text-red tabular-nums">{String(index + 1).padStart(2, "0")}</span>
           <div>
