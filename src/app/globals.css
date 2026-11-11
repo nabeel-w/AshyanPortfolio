@@ -168,7 +168,7 @@
     color: var(--ivory);
   }
   :focus-visible {
-    outline: 1px solid var(--cinema-red);
+    outline: 2px solid var(--signal-red);
     outline-offset: 3px;
   }
 }

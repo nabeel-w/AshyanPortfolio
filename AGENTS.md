@@ -13,7 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Portfolio + admin CMS for **Ashyan Zafar, film editor**. The selling point is the UI: luxury, cinematic, **black · white · red**, instant loads, best-in-class SEO/GEO, and a mobile layout designed on purpose (not just shrunk).
 Repo: `github.com/nabeel-w/AshyanPortfolio` (branch `main`). Push as gh account **nabeel-w**. The machine's default active gh account is `nabeel-uprez`, and gh's credential helper only uses the active account, so run `gh auth switch -h github.com -u nabeel-w` before `git push` / `gh` commands and switch back afterwards. Pass `-R nabeel-w/AshyanPortfolio` to gh. Work is tracked in GitHub issues #1–#21 (labels `phase-1`…`phase-6`, `area:*`, `decision`); see docs/06.
 
-Plans live in `docs/`: 01 design direction · 02 architecture/folders/editor · 03 asset storage · 04 analytics dashboard · 05 SEO/GEO · 06 roadmap + open questions. **Read them before building a feature.**
+Plans live in `docs/`: 01 design direction · 02 architecture/folders/editor · 03 asset storage · 04 analytics dashboard · 05 SEO/GEO · 06 roadmap + open questions · 07 storage costs · 08 mobile perf + a11y audit (findings, open items). **Read them before building a feature.**
 
 ## Commands (pnpm only — never npm/yarn)
 
