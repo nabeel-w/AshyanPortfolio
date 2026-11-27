@@ -32,3 +32,17 @@ export function relatedWork<T extends Item>(list: T[], slug: string, labelSlugs:
   add(others);
   return picked;
 }
+
+/**
+ * Which project-page layout a film gets (#30): portrait reels and square edits sit beside the text in
+ * their own box; landscape films (or no film) keep the full-bleed cinematic hero.
+ */
+export type ProjectLayout = "landscape" | "portrait";
+export function projectLayout(p: { film?: { orientation: "landscape" | "portrait" | "square" } }): ProjectLayout {
+  return p.film && p.film.orientation !== "landscape" ? "portrait" : "landscape";
+}
+
+/** Share-card template for a project: the split card for reels, the full-bleed still otherwise. */
+export function projectOgTemplate(p: { film?: { orientation: "landscape" | "portrait" | "square" } }): "portrait" | "still" {
+  return projectLayout(p) === "portrait" ? "portrait" : "still";
+}

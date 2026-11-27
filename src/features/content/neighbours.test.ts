@@ -33,3 +33,15 @@ describe("relatedWork ('More in <label>')", () => {
     expect(relatedWork(list, "b", [], 2).map((p) => p.slug)).toEqual(["a", "c"]);
   });
 });
+
+describe("project layout and share card by orientation (#30)", () => {
+  it("portrait and square films get the side-by-side layout and the split card; landscape / no film keep the hero", async () => {
+    const { projectLayout, projectOgTemplate } = await import("./neighbours");
+    expect(projectLayout({ film: { orientation: "portrait" } })).toBe("portrait");
+    expect(projectLayout({ film: { orientation: "square" } })).toBe("portrait");
+    expect(projectLayout({ film: { orientation: "landscape" } })).toBe("landscape");
+    expect(projectLayout({})).toBe("landscape");
+    expect(projectOgTemplate({ film: { orientation: "portrait" } })).toBe("portrait");
+    expect(projectOgTemplate({})).toBe("still");
+  });
+});

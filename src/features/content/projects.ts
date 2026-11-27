@@ -15,7 +15,14 @@ import { neighbours, relatedWork } from "./neighbours";
 import { getPublishedProjects, getWorkList, loopOf, type LoopRef, type WorkItem } from "./queries";
 import { tags } from "./tags";
 
-export type MediaImage = { src: string; alt: string; width?: number; height?: number; blurDataUrl?: string };
+export type MediaImage = {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  blurDataUrl?: string;
+  caption?: string;
+};
 /** A project's film: always a YouTube video behind the click-to-play facade (#24, #25). */
 export type Film = {
   youtubeId: string;
@@ -87,6 +94,7 @@ const image = (a: Asset | null | undefined): MediaImage | undefined =>
         width: a.width ?? undefined,
         height: a.height ?? undefined,
         blurDataUrl: a.blurDataUrl ?? undefined,
+        caption: a.caption?.trim() || undefined,
       }
     : undefined;
 
