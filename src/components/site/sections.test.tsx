@@ -130,6 +130,12 @@ describe("<ClientMarquee>", () => {
     expect(screen.getAllByText("Zara")[0]).toBeInTheDocument();
   });
 
+  it("shows the section label but never a client count", () => {
+    const { container } = render(<ClientMarquee {...props} label="Trusted by" />);
+    expect(screen.getByText("Trusted by")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/d+s*Clients/i);
+  });
+
   it("renders nothing without clients", () => {
     const { container } = render(<ClientMarquee label="x" speed={40} clients={[]} />);
     expect(container).toBeEmptyDOMElement();
