@@ -2,6 +2,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { z } from "zod";
 import type { Asset, Project } from "@/generated/prisma/client";
+import { parsePageShare, type PageShare } from "@/features/seo/share";
 import { db } from "@/lib/db";
 import {
   aspectFor,
@@ -65,6 +66,8 @@ export type ProjectDetail = {
   /** Admin overrides for <title> / meta description (fall back to title — format / summary). */
   seoTitle?: string;
   seoDescription?: string;
+  /** Share card override (#33) */
+  share?: PageShare;
   publishedAt?: Date;
   updatedAt?: Date;
   /** Neighbours in grid order (wrapping); prev is omitted when there are only two films */
@@ -187,6 +190,7 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     gallery: p.gallery.flatMap((g) => image(g.asset) ?? []),
     seoTitle: p.seoTitle?.trim() || undefined,
     seoDescription: p.seoDescription?.trim() || undefined,
+    share: parsePageShare(p.share),
     publishedAt: p.publishedAt ?? undefined,
     updatedAt: p.updatedAt,
     ...neighbours(list, p.slug),
@@ -216,6 +220,7 @@ async function fallbackProject(slug: string): Promise<ProjectDetail | null> {
     credits: [],
     cover: p.cover,
     gallery: [],
+    share: parsePageShare(null),
     ...neighbours(list, p.slug),
     related: relatedWork(
       list,

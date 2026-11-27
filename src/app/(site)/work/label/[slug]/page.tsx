@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { WorkGrid } from "@/components/site/work-grid";
 import { chipLabels, getLabel, getLabels, getSite } from "@/features/content/queries";
 import { JsonLd, labelPageJsonLd } from "@/features/seo/json-ld";
+import { shareImages } from "@/features/seo/share-server";
 
 /**
  * /work/label/<slug>: a static, indexable page per label (#28). Same grid as /work, with this label's
@@ -20,7 +21,7 @@ const introFor = (name: string, count: number, editor: string) =>
 
 export async function generateMetadata({ params }: PageProps<"/work/label/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const [hit, site] = await Promise.all([getLabel(slug), getSite()]);
+  const [hit, site, images] = await Promise.all([getLabel(slug), getSite(), shareImages({ kind: "label", slug })]);
   if (!hit || "redirect" in hit) return {};
   const { label } = hit;
   const title = label.seoTitle || `${label.name} — Work`;
@@ -35,9 +36,9 @@ export async function generateMetadata({ params }: PageProps<"/work/label/[slug]
       title,
       description,
       url: path,
-      images: [{ url: `/opengraph-image?label=${label.slug}`, width: 1200, height: 630, alt: `${label.name} — ${site.name}` }],
+      images: images.openGraph,
     },
-    twitter: { card: "summary_large_image", title, description, images: [`/opengraph-image?label=${label.slug}`] },
+    twitter: { card: "summary_large_image", title, description, images: images.twitter },
   };
 }
 

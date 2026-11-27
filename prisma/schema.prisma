@@ -296,6 +296,8 @@ model Project {
 
   seoTitle       String?
   seoDescription String?
+  /// Share card override (headline, background, template) — share.ts pageShareSchema
+  share          Json?
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -338,7 +340,10 @@ model Page {
   title          String
   seoTitle       String?
   seoDescription String?
+  /// Legacy, never read or written; dropped with the Mux fields
   ogImageUrl     String?
+  /// Per-page share card override (background, headline, meta, template) — share.ts pageShareSchema
+  share          Json?
   status         PublishStatus @default(DRAFT)
   publishedAt    DateTime?
   sections       Section[]
@@ -397,6 +402,9 @@ model SiteSettings {
   /// E.164 number for the floating WhatsApp button, e.g. "+91 83349 08607"
   whatsapp        String?
   whatsappMessage String?
+  /// Share card + search/social defaults (Settings → Sharing & SEO), validated by
+  /// src/features/seo/share.ts siteShareSchema. Null = today's defaults (hero still + headline).
+  share           Json?
   updatedAt     DateTime @updatedAt
 }
 

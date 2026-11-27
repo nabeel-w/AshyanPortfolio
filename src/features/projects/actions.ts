@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { invalidate } from "@/features/content/invalidate";
 import { db } from "@/lib/db";
+import { pageShareSchema } from "@/features/seo/share";
 import { requireAdmin } from "@/lib/session";
 import { parseRuntime, parseYouTubeUrl, watchUrl } from "@/lib/youtube";
 
@@ -66,6 +67,8 @@ const projectInput = z.object({
   labelIds: z.array(z.string().min(1).max(64)).max(12, "Up to 12 labels").default([]),
   seoTitle: optionalText(70),
   seoDescription: optionalText(170),
+  /** Share card override (#33) */
+  share: pageShareSchema.optional(),
 });
 
 export type ProjectInput = z.input<typeof projectInput>;
@@ -109,6 +112,7 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
     publishedAt: input.status === "PUBLISHED" ? (previous?.publishedAt ?? new Date()) : (previous?.publishedAt ?? null),
     seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
+    ...(input.share ? { share: input.share as Prisma.InputJsonValue } : {}),
     coverId: input.coverId,
     filmUrl: input.filmUrl,
     filmYoutubeId: film?.id ?? null,

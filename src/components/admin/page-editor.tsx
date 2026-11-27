@@ -29,9 +29,13 @@ import {
   restoreRevision,
   setSectionVisible,
   updatePageSeo,
+  updatePageShare,
 } from "@/features/pages/actions";
 import { cn } from "@/lib/utils";
+import type { PageShareInput } from "@/features/seo/share";
+import { absoluteUrl } from "@/lib/site-url";
 import { ConfirmButton } from "./confirm-button";
+import { ShareOverrideEditor } from "./share/share-fields";
 import { DevicePreview, DeviceToggle, type Device } from "./device-preview";
 
 type Section = { id: string; type: string; visible: boolean; dirty: boolean; isNew: boolean; liveVisible: boolean };
@@ -41,6 +45,7 @@ type Page = {
   title: string;
   seoTitle: string;
   seoDescription: string;
+  share: PageShareInput;
   publishedAt: Date | null;
   sections: Section[];
   revisions: { id: string; createdAt: Date; note: string | null }[];
@@ -186,7 +191,17 @@ export function PageEditor({ page, types }: { page: Page; types: { type: string;
             </Button>
           )}
 
-          <SeoForm page={page} disabled={pending} onSave={(v) => run(() => updatePageSeo(page.id, v), "SEO saved")} />
+          <SeoForm
+            page={page}
+            disabled={pending}
+            onSave={(v) => run(() => updatePageSeo(page.id, v), "SEO saved")}
+            onSaveShare={(share) =>
+              run(async () => {
+                const res = await updatePageShare(page.id, share);
+                if (!res.ok) throw new Error(Object.values(res.errors)[0] ?? "Check the share card fields");
+              }, "Share card saved — its link changed, so apps refetch it")
+            }
+          />
 
           {page.revisions.length ? (
             <details className="rounded-md border border-border p-3">
@@ -278,8 +293,20 @@ function SortableRow({
   );
 }
 
-function SeoForm({ page, disabled, onSave }: { page: Page; disabled: boolean; onSave: (v: { title: string; seoTitle: string; seoDescription: string }) => void }) {
+function SeoForm({
+  page,
+  disabled,
+  onSave,
+  onSaveShare,
+}: {
+  page: Page;
+  disabled: boolean;
+  onSave: (v: { title: string; seoTitle: string; seoDescription: string }) => void;
+  onSaveShare: (share: PageShareInput) => void;
+}) {
   const [v, setV] = useState({ title: page.title, seoTitle: page.seoTitle, seoDescription: page.seoDescription });
+  const [share, setShare] = useState<PageShareInput>(page.share);
+  const path = page.slug === "home" ? "/" : `/${page.slug}`;
   return (
     <details className="rounded-md border border-border p-3">
       <summary className="cursor-pointer text-sm">Search & sharing (SEO)</summary>
@@ -306,6 +333,24 @@ function SeoForm({ page, disabled, onSave }: { page: Page; disabled: boolean; on
           Save SEO
         </Button>
       </form>
+      {(["home", "work", "about", "contact"] as string[]).includes(page.slug) ? (
+        <div className="mt-5 space-y-3 border-t border-border pt-4">
+          <ShareOverrideEditor
+            value={share}
+            onChange={setShare}
+            target={{ kind: "page", slug: page.slug }}
+            context={{
+              title: v.seoTitle || page.title,
+              description: v.seoDescription || "",
+              url: absoluteUrl(path),
+            }}
+            defaults={{ headline: "Settings → Sharing & SEO", background: "From Settings → Sharing & SEO", template: "from Settings" }}
+          />
+          <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => onSaveShare(share)}>
+            Save share card
+          </Button>
+        </div>
+      ) : null}
     </details>
   );
 }

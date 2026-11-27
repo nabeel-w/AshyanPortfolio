@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ProjectForm } from "@/components/admin/project-form";
 import { clockDuration } from "@/features/media/delivery";
+import { parsePageShare } from "@/features/seo/share";
 import { toAssetSummary } from "@/features/media/summary";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
@@ -44,6 +45,7 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
         status: p.status,
         seoTitle: p.seoTitle ?? "",
         seoDescription: p.seoDescription ?? "",
+        share: parsePageShare(p.share),
         cover: p.cover ? toAssetSummary(p.cover) : null,
         filmUrl: p.filmUrl ?? "",
         filmOrientation: p.filmOrientation,

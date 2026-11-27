@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { invalidate } from "@/features/content/invalidate";
 import { db } from "@/lib/db";
+import { siteShareSchema, type SiteShareInput } from "@/features/seo/share";
 import { requireAdmin } from "@/lib/session";
 
 const text = (max: number) =>
@@ -41,6 +42,24 @@ export async function saveSettings(raw: SettingsInput) {
   const data = { ...parsed.data, socials: parsed.data.socials as Prisma.InputJsonValue };
   await db.siteSettings.upsert({ where: { id: "site" }, update: data, create: { id: "site", ...data } });
   invalidate.site();
+  return { ok: true as const };
+}
+
+/** Settings → Sharing & SEO (#33). Changes every card's ?v= that depends on it, so chat apps refetch. */
+export async function saveShareSettings(raw: SiteShareInput) {
+  await requireAdmin();
+  const parsed = siteShareSchema.safeParse(raw);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const i of parsed.error.issues) errors[i.path.join(".")] ??= i.message;
+    return { ok: false as const, errors };
+  }
+  const share = parsed.data as Prisma.InputJsonValue;
+  await db.siteSettings.upsert({ where: { id: "site" }, update: { share }, create: { id: "site", share } });
+  invalidate.site();
+  invalidate.projects();
+  invalidate.labels();
+  for (const slug of ["home", "work", "about", "contact"]) invalidate.page(slug);
   return { ok: true as const };
 }
 

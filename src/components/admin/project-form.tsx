@@ -9,7 +9,9 @@ import type { FieldDef } from "@/features/admin/fields";
 import type { AssetSummary } from "@/features/media/summary";
 import { deleteProject, saveProject, type ProjectInput } from "@/features/projects/actions";
 import { AssetField, GalleryField } from "./asset-field";
+import { absoluteUrl } from "@/lib/site-url";
 import { ConfirmButton } from "./confirm-button";
+import { ShareOverrideEditor } from "./share/share-fields";
 import { LabelPicker, type PickedLabel } from "./label-picker";
 import { YouTubeFilmField, type YouTubeFilmValue } from "./youtube-film-field";
 import { SchemaForm } from "./schema-form";
@@ -225,6 +227,30 @@ export function ProjectForm({
               onChange={(v) => setValue(v as unknown as ProjectFormValue)}
               errors={errors}
             />
+          </section>
+          <section className="space-y-3 rounded-md border border-border bg-onyx p-5">
+            {id && live ? (
+              <ShareOverrideEditor
+                value={value.share ?? {}}
+                onChange={(share) => set({ share })}
+                target={{ kind: "project", slug: initial.slug ?? "" }}
+                context={{
+                  title: value.seoTitle || `${value.title} — ${value.format || "Film"}`,
+                  description: value.seoDescription || value.summary || "",
+                  url: absoluteUrl(`/work/${initial.slug}`),
+                }}
+                defaults={{
+                  headline: value.title || "The project title",
+                  background: "Using the cover",
+                  template: value.filmOrientation === "LANDSCAPE" ? "still + title" : "portrait split",
+                }}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Share card: publish the project to preview and customise its card. By default it uses the cover and title
+                (reels get the portrait split).
+              </p>
+            )}
           </section>
         </aside>
       </div>

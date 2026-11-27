@@ -1,4 +1,5 @@
 import "server-only";
+import { parsePageShare } from "@/features/seo/share";
 import { db } from "@/lib/db";
 
 /** Uncached reads for the admin editor (always fresh). Callers must have checked requireAdmin(). */
@@ -73,6 +74,7 @@ export async function getPageForEditor(slug: string) {
     title: page.title,
     seoTitle: page.seoTitle ?? "",
     seoDescription: page.seoDescription ?? "",
+    share: parsePageShare(page.share),
     status: page.status,
     publishedAt: page.publishedAt,
     sections,

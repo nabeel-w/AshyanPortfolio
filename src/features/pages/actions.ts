@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { pageSections } from "@/content/fallback";
 import { invalidate } from "@/features/content/invalidate";
+import { pageShareSchema, type PageShareInput } from "@/features/seo/share";
 import { upgradeSectionData, sectionSchemas, type SectionType } from "@/features/sections/schemas";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
@@ -175,4 +176,24 @@ export async function updatePageSeo(pageId: string, input: z.input<typeof seoSch
     data: { title: data.title, seoTitle: data.seoTitle || null, seoDescription: data.seoDescription || null },
   });
   invalidate.page(page.slug);
+}
+
+/**
+ * This page's own share card (#33): background, headline, meta and template. Empty fields fall
+ * through to Settings → Sharing & SEO. Saving changes the card's ?v=, so chat apps refetch it.
+ */
+export async function updatePageShare(pageId: string, input: PageShareInput) {
+  await requireAdmin();
+  const parsed = pageShareSchema.safeParse(input);
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) errors[issue.path.join(".") || "_"] ??= issue.message;
+    return { ok: false as const, errors };
+  }
+  const page = await db.page.update({
+    where: { id: id.parse(pageId) },
+    data: { share: parsed.data as Prisma.InputJsonValue },
+  });
+  invalidate.page(page.slug);
+  return { ok: true as const };
 }

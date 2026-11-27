@@ -10,6 +10,7 @@ import { getProject, getProjectSlugs, projectMeta, type ProjectDetail } from "@/
 import { getSite, type WorkItem } from "@/features/content/queries";
 import { clockDuration } from "@/features/media/delivery";
 import { JsonLd, projectJsonLd } from "@/features/seo/json-ld";
+import { shareImages } from "@/features/seo/share-server";
 import { cn } from "@/lib/utils";
 
 export async function generateStaticParams() {
@@ -18,7 +19,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/work/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const p = await getProject(slug);
+  const [p, images] = await Promise.all([getProject(slug), shareImages({ kind: "project", slug })]);
   if (!p) return {};
   const { title, description } = projectMeta(p);
   return {
@@ -30,9 +31,10 @@ export async function generateMetadata({ params }: PageProps<"/work/[slug]">): P
       url: `/work/${p.slug}`,
       title,
       description,
+      images: images.openGraph,
       ...(p.film ? { videos: [{ url: p.film.embedUrl, type: "text/html" }] } : {}),
     },
-    twitter: { card: "summary_large_image", title, description },
+    twitter: { card: "summary_large_image", title, description, images: images.twitter },
   };
 }
 

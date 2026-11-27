@@ -9,6 +9,7 @@ import {
   type SectionProps,
 } from "@/features/sections/schemas";
 import type { Asset, Prisma } from "@/generated/prisma/client";
+import { parsePageShare } from "@/features/seo/share";
 import { db } from "@/lib/db";
 import { tags } from "./tags";
 
@@ -311,8 +312,16 @@ export async function getPageMeta(slug: string) {
   "use cache";
   cacheTag(tags.page(slug));
   cacheLife("max");
-  const page = await db.page.findUnique({ where: { slug }, select: { title: true, seoTitle: true, seoDescription: true } });
-  return { title: page?.seoTitle || page?.title || null, description: page?.seoDescription || null };
+  const page = await db.page.findUnique({
+    where: { slug },
+    select: { title: true, seoTitle: true, seoDescription: true, share: true },
+  });
+  return {
+    title: page?.seoTitle || page?.title || null,
+    description: page?.seoDescription || null,
+    /** This page's own share card (#33); empty fields fall through to Settings */
+    share: parsePageShare(page?.share),
+  };
 }
 
 /** Work list for sitemap / llms.txt: real projects, else whatever the home work grid shows. */

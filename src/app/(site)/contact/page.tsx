@@ -1,10 +1,7 @@
-import { pageMetadata, PublishedPage } from "@/features/content/published-page";
+import { pageDefaults, pageMetadata, PublishedPage } from "@/features/content/published-page";
 
 export function generateMetadata() {
-  return pageMetadata("contact", "/contact", {
-    title: "Contact",
-    description: "Hire Ashyan Zafar, film editor. Tell me about your project and I'll reply within 24 hours.",
-  });
+  return pageMetadata("contact", "/contact", pageDefaults.contact);
 }
 
 export default function ContactPage() {
