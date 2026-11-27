@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireAdmin = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/session", () => ({ requireAdmin }));
 
-const invalidate = vi.hoisted(() => ({ projects: vi.fn(), clients: vi.fn(), site: vi.fn() }));
+const invalidate = vi.hoisted(() => ({ projects: vi.fn(), clients: vi.fn(), site: vi.fn(), labels: vi.fn() }));
 vi.mock("@/features/content/invalidate", () => ({ invalidate }));
 
 const headersGet = vi.hoisted(() => vi.fn(() => "http://localhost:3000/contact"));
@@ -21,6 +21,7 @@ const db = vi.hoisted(() => {
   const client = {
     project: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     projectMedia: { deleteMany: vi.fn(), createMany: vi.fn() },
+    projectLabel: { deleteMany: vi.fn(), createMany: vi.fn() },
     category: { upsert: vi.fn(async () => ({ id: "cat_1" })) },
     client: { deleteMany: vi.fn(), update: vi.fn(), create: vi.fn() },
     siteSettings: { upsert: vi.fn() },
@@ -58,16 +59,21 @@ describe("saveProject", () => {
     expect(db.project.create).not.toHaveBeenCalled();
   });
 
-  it("generates a clean slug, creates the category and refreshes caches", async () => {
+  it("generates a clean slug, stores labels in order (first = primary) and refreshes caches", async () => {
     const res = await saveProject(null, {
       title: "Résonance — Director's Cut",
-      category: "Fashion",
+      labelIds: ["lbl_fashion", "lbl_reels", "lbl_fashion"],
     });
     expect(res).toEqual({ ok: true, id: "p_new", slug: "resonance-director-s-cut" });
-    expect(db.category.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { slug: "fashion" } }),
-    );
+    expect(db.projectLabel.deleteMany).toHaveBeenCalledWith({ where: { projectId: "p_new" } });
+    expect(db.projectLabel.createMany).toHaveBeenCalledWith({
+      data: [
+        { projectId: "p_new", labelId: "lbl_fashion", order: 0 },
+        { projectId: "p_new", labelId: "lbl_reels", order: 1 },
+      ],
+    });
     expect(invalidate.projects).toHaveBeenCalledWith("resonance-director-s-cut");
+    expect(invalidate.labels).toHaveBeenCalled();
   });
 
   it("rejects a slug already used by another project", async () => {

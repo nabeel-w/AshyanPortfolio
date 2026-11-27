@@ -32,7 +32,6 @@ const projectInput = z.object({
   clientName: optionalText(120),
   year: z.coerce.number().int().min(1990).max(2100).nullish(),
   role: optionalText(120),
-  category: optionalText(60),
   summary: optionalText(200),
   story: optionalText(8000),
   transcript: optionalText(50000),
@@ -61,6 +60,8 @@ const projectInput = z.object({
     .refine((v) => !v || parseRuntime(v) !== null, "Use minutes:seconds, e.g. 2:41"),
   loopId: optionalId,
   galleryIds: z.array(z.string().min(1).max(64)).default([]),
+  /** Ordered; the first is the primary label (#28) */
+  labelIds: z.array(z.string().min(1).max(64)).max(12, "Up to 12 labels").default([]),
   seoTitle: optionalText(70),
   seoDescription: optionalText(170),
 });
@@ -86,14 +87,6 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
     return { ok: false, errors: { coverId: "A published project needs a cover image" } };
   }
 
-  const category = input.category
-    ? await db.category.upsert({
-        where: { slug: slugify(input.category) },
-        update: {},
-        create: { name: input.category, slug: slugify(input.category) },
-      })
-    : null;
-
   const film = parseYouTubeUrl(input.filmUrl);
   const previous = id ? await db.project.findUnique({ where: { id }, select: { slug: true, status: true, publishedAt: true } }) : null;
   const data = {
@@ -113,7 +106,6 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
     publishedAt: input.status === "PUBLISHED" ? (previous?.publishedAt ?? new Date()) : (previous?.publishedAt ?? null),
     seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
-    categoryId: category?.id ?? null,
     coverId: input.coverId,
     filmUrl: input.filmUrl,
     filmYoutubeId: film?.id ?? null,
@@ -125,6 +117,11 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
 
   const project = await db.$transaction(async (tx) => {
     const p = id ? await tx.project.update({ where: { id }, data }) : await tx.project.create({ data });
+    await tx.projectLabel.deleteMany({ where: { projectId: p.id } });
+    const labelIds = [...new Set(input.labelIds)];
+    if (labelIds.length) {
+      await tx.projectLabel.createMany({ data: labelIds.map((labelId, order) => ({ projectId: p.id, labelId, order })) });
+    }
     await tx.projectMedia.deleteMany({ where: { projectId: p.id } });
     if (input.galleryIds.length) {
       await tx.projectMedia.createMany({ data: input.galleryIds.map((assetId, order) => ({ projectId: p.id, assetId, order })) });
@@ -133,6 +130,7 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
   });
 
   invalidate.projects(project.slug);
+  invalidate.labels();
   if (previous && previous.slug !== project.slug) invalidate.projects(previous.slug);
   return { ok: true, id: project.id, slug: project.slug };
 }
@@ -141,6 +139,7 @@ export async function deleteProject(id: string) {
   await requireAdmin();
   const p = await db.project.delete({ where: { id: z.string().min(1).parse(id) } });
   invalidate.projects(p.slug);
+  invalidate.labels();
 }
 
 export type YouTubeLookup = { ok: true; title: string; author?: string } | { ok: false; error: string };

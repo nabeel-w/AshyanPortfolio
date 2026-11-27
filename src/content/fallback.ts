@@ -36,6 +36,14 @@ const img = (name: string, width: number, height: number, alt: string) => ({
   alt,
 });
 
+/** Stand-in labels (the Label table replaces these once it has rows). */
+const L = {
+  commercial: { name: "Commercial", slug: "commercial" },
+  fashion: { name: "Fashion", slug: "fashion" },
+  film: { name: "Film", slug: "film" },
+  documentary: { name: "Documentary", slug: "documentary" },
+};
+
 export const homeSections: SectionData[] = [
   {
     id: "hero",
@@ -76,13 +84,15 @@ export const homeSections: SectionData[] = [
     data: {
       label: "Selected work",
       tone: "ink",
-      categories: ["All", "Commercial", "Fashion", "Film", "Documentary"],
+      labels: "auto",
+      chips: "links",
+      labelList: [],
       projects: [
-        { slug: "the-next-chapter", title: "The Next Chapter", format: "Brand Film", year: 2024, category: "Commercial", cover: img("next-chapter", 1672, 941, "Extreme close-up of an eye under dappled leaf shadows with a red glint") },
-        { slug: "drive-further", title: "Drive Further", format: "Commercial", year: 2024, category: "Commercial", cover: img("drive-further", 1672, 941, "Black sports car under a concrete bridge at night, red tail light on wet asphalt") },
-        { slug: "resonance", title: "Résonance", format: "Fashion Film", year: 2023, category: "Fashion", cover: img("resonance", 1672, 941, "Model in a flowing red silk dress on a black-sand coastline") },
-        { slug: "the-silent-ones", title: "The Silent Ones", format: "Short Film", year: 2023, category: "Film", cover: img("silent-ones", 1672, 941, "Profile silhouette of a man in backlit smoke") },
-        { slug: "mumbai-my-city", title: "Mumbai, My City", format: "Documentary", year: 2022, category: "Documentary", cover: img("mumbai", 1672, 941, "Mumbai skyline at blue hour with red aircraft lights on the towers") },
+        { slug: "the-next-chapter", title: "The Next Chapter", format: "Brand Film", year: 2024, labels: [L.commercial], cover: img("next-chapter", 1672, 941, "Extreme close-up of an eye under dappled leaf shadows with a red glint") },
+        { slug: "drive-further", title: "Drive Further", format: "Commercial", year: 2024, labels: [L.commercial], cover: img("drive-further", 1672, 941, "Black sports car under a concrete bridge at night, red tail light on wet asphalt") },
+        { slug: "resonance", title: "Résonance", format: "Fashion Film", year: 2023, labels: [L.fashion], cover: img("resonance", 1672, 941, "Model in a flowing red silk dress on a black-sand coastline") },
+        { slug: "the-silent-ones", title: "The Silent Ones", format: "Short Film", year: 2023, labels: [L.film], cover: img("silent-ones", 1672, 941, "Profile silhouette of a man in backlit smoke") },
+        { slug: "mumbai-my-city", title: "Mumbai, My City", format: "Documentary", year: 2022, labels: [L.documentary], cover: img("mumbai", 1672, 941, "Mumbai skyline at blue hour with red aircraft lights on the towers") },
       ],
     },
   },
@@ -137,7 +147,7 @@ export const pageSections: Record<"home" | "work" | "about" | "contact", Section
           "Commercials, fashion films, documentaries and short films — edited for pace, performance and the quiet moments between.",
       },
     },
-    { ...workGrid, id: "work-grid", data: { ...workGrid.data, label: "All work" } } as SectionData,
+    { ...workGrid, id: "work-grid", data: { ...workGrid.data, label: "All work", chips: "filter" } } as SectionData,
   ],
   about: [
     {

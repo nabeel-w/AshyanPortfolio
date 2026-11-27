@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { homeSections, pageSections, site } from "@/content/fallback";
 import type { SectionData, SectionProps } from "@/features/sections/schemas";
 import { SectionRenderer } from "@/features/sections/registry";
@@ -43,18 +43,42 @@ describe("Contact page sections", () => {
 });
 
 describe("Work filter", () => {
-  it("shows only the chosen category and restores everything with the first chip", async () => {
+  const props = () => ({ ...data(homeSections, "workGrid"), chips: "filter" as const });
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("on /work, filters in place, updates the count and the URL, and restores everything with All", async () => {
+    window.history.replaceState(null, "", "/work");
     const user = userEvent.setup();
-    const props = data(homeSections, "workGrid");
-    const { container } = render(<WorkGrid {...props} />);
-    const items = () => [...container.querySelectorAll<HTMLElement>("li[data-category]")];
+    const { container } = render(<WorkGrid {...props()} />);
+    const shown = () => [...container.querySelectorAll<HTMLElement>("li[data-labels]")].filter((li) => !li.hidden);
     const nav = screen.getByRole("navigation", { name: /filter work/i });
 
-    await user.click(within(nav).getByRole("button", { name: "Fashion" }));
-    expect(within(nav).getByRole("button", { name: "Fashion" })).toHaveAttribute("aria-pressed", "true");
-    expect(items().filter((li) => !li.hidden).map((li) => li.dataset.category)).toEqual(["Fashion"]);
+    await user.click(within(nav).getByRole("link", { name: /Fashion/ }));
+    expect(within(nav).getByRole("link", { name: /Fashion/ })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: /All/ })).not.toHaveAttribute("aria-current");
+    expect(shown().map((li) => li.dataset.labels)).toEqual(["fashion"]);
+    expect(container.querySelector("[data-work-count]")).toHaveTextContent("01");
+    expect(window.location.search).toBe("?label=fashion");
 
-    await user.click(within(nav).getByRole("button", { name: "All" }));
-    expect(items().every((li) => !li.hidden)).toBe(true);
+    await user.click(within(nav).getByRole("link", { name: /All/ }));
+    expect(shown()).toHaveLength(5);
+    expect(container.querySelector("[data-work-count]")).toHaveTextContent("05");
+    expect(window.location.search).toBe("");
+  });
+
+  it("loads already filtered from ?label= and follows the back button", async () => {
+    window.history.replaceState(null, "", "/work?label=commercial");
+    const { container } = render(<WorkGrid {...props()} />);
+    const shown = () => [...container.querySelectorAll<HTMLElement>("li[data-labels]")].filter((li) => !li.hidden);
+    expect(shown()).toHaveLength(2);
+    window.history.replaceState(null, "", "/work?label=documentary");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(shown().map((li) => li.dataset.labels)).toEqual(["documentary"]);
+  });
+
+  it("ignores an unknown ?label= (shows everything)", () => {
+    window.history.replaceState(null, "", "/work?label=nope");
+    const { container } = render(<WorkGrid {...props()} />);
+    expect([...container.querySelectorAll<HTMLElement>("li[data-labels]")].every((li) => !li.hidden)).toBe(true);
   });
 });

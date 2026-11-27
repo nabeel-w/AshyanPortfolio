@@ -6,6 +6,8 @@ import { YouTubeFilm } from "@/components/media/youtube-film";
 import { getProject, getProjectSlugs, projectMeta } from "@/features/content/projects";
 import { getSite } from "@/features/content/queries";
 import { clockDuration } from "@/features/media/delivery";
+import { LabelChip, labelHref } from "@/components/site/label-chip";
+import { RelatedWork } from "@/components/site/related-work";
 import { JsonLd, projectJsonLd } from "@/features/seo/json-ld";
 
 export async function generateStaticParams() {
@@ -44,6 +46,7 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
     ["Role", p.role],
     ["Runtime", p.film?.duration ? clockDuration(p.film.duration) : undefined],
   ].filter((f): f is [string, string] => Boolean(f[1]));
+  const primary = p.labels[0];
 
   return (
     <article className="bg-ink pt-16 md:pt-20">
@@ -77,7 +80,7 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
             <span aria-hidden className="mx-2 text-red">
               /
             </span>
-            {p.category}
+            {primary?.visible ? <LabelChip label={primary} variant="crumb" /> : p.category}
           </nav>
           <h1 className="font-serif text-headline text-ivory [text-wrap:balance]">{p.title}</h1>
           {p.summary ? (
@@ -108,6 +111,22 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
                 <dd className="mt-1 text-ivory">{v}</dd>
               </div>
             ))}
+            {p.labels.length ? (
+              <div className="col-span-2 lg:col-span-1">
+                <dt className="label text-smoke">Labels</dt>
+                <dd className="mt-2 flex flex-wrap gap-2">
+                  {p.labels.map((l) =>
+                    l.visible ? (
+                      <LabelChip key={l.slug} label={l} />
+                    ) : (
+                      <span key={l.slug} className="label inline-flex h-7 items-center border border-foreground/10 px-2.5 text-smoke">
+                        {l.name}
+                      </span>
+                    ),
+                  )}
+                </dd>
+              </div>
+            ) : null}
           </dl>
           {p.credits.length ? (
             <div className="mt-10 border-t border-hairline pt-6">
@@ -136,6 +155,24 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {p.related.length ? (
+        <section aria-labelledby="related-title" className="container-site border-t border-hairline py-16 md:py-24">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <h2 id="related-title" className="font-serif text-title text-ivory">
+              More in <em className="text-red italic">{primary?.visible ? primary.name.toLowerCase() : "work"}</em>
+            </h2>
+            <Link
+              href={primary?.visible ? labelHref(primary.slug) : "/work"}
+              className="label link-cut text-smoke hover:text-ivory"
+              data-cta="related:all"
+            >
+              {primary?.visible ? `All ${primary.name.toLowerCase()} →` : "All work →"}
+            </Link>
+          </div>
+          <RelatedWork items={p.related} />
         </section>
       ) : null}
 

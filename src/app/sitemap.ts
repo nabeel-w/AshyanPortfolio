@@ -1,12 +1,12 @@
 import type { MetadataRoute } from "next";
 import { getProject } from "@/features/content/projects";
-import { getWorkList } from "@/features/content/queries";
+import { getLabels, getWorkList } from "@/features/content/queries";
 import { absoluteUrl } from "@/lib/site-url";
 
 const abs = (src: string) => (src.startsWith("http") ? src : absoluteUrl(src));
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const work = await getWorkList();
+  const [work, labels] = await Promise.all([getWorkList(), getLabels()]);
   const projects = (await Promise.all(work.map((w) => getProject(w.slug)))).filter((p) => p !== null);
 
   return [
@@ -14,6 +14,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absoluteUrl("/work"), changeFrequency: "weekly", priority: 0.9 },
     { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.7 },
     { url: absoluteUrl("/contact"), changeFrequency: "yearly", priority: 0.6 },
+    // One indexable page per visible label that has work (#28)
+    ...labels
+      .filter((l) => l.count > 0)
+      .map((l) => ({
+        url: absoluteUrl(`/work/label/${l.slug}`),
+        changeFrequency: "weekly" as const,
+        priority: 0.7,
+      })),
     ...projects.map((p) => ({
       url: absoluteUrl(`/work/${p.slug}`),
       lastModified: p.updatedAt,

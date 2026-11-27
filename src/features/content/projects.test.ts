@@ -4,6 +4,7 @@ const db = vi.hoisted(() => ({
   project: { findFirst: vi.fn(), findMany: vi.fn() },
   page: { findFirst: vi.fn() },
   client: { findMany: vi.fn() },
+  label: { count: vi.fn(async () => 0), findMany: vi.fn(async () => []) },
 }));
 vi.mock("@/lib/db", () => ({ db }));
 
@@ -24,7 +25,10 @@ const row = {
   createdAt: new Date("2023-01-01"),
   updatedAt: new Date("2023-02-01"),
   publishedAt: new Date("2023-06-01"),
-  category: { name: "Fashion" },
+  labels: [
+    { order: 0, label: { name: "Fashion", slug: "fashion", visible: true } },
+    { order: 1, label: { name: "Reels", slug: "reels", visible: false } },
+  ],
   cover: ready(),
   filmUrl: "https://youtu.be/dQw4w9WgXcQ?t=5",
   filmYoutubeId: "dQw4w9WgXcQ",
@@ -37,8 +41,8 @@ const row = {
 
 beforeEach(() => {
   db.project.findMany.mockResolvedValue([
-    { slug: "resonance", title: "Résonance", cover: ready() },
-    { slug: "mumbai", title: "Mumbai", cover: ready({ url: "https://cdn/m.webp" }) },
+    { slug: "resonance", title: "Résonance", createdAt: new Date("2023-01-01"), labels: [], cover: ready() },
+    { slug: "mumbai", title: "Mumbai", createdAt: new Date("2022-01-01"), labels: [], cover: ready({ url: "https://cdn/m.webp" }) },
   ]);
   db.page.findFirst.mockResolvedValue(null);
   db.client.findMany.mockResolvedValue([]);
@@ -51,6 +55,10 @@ describe("getProject", () => {
     expect(p).toMatchObject({
       slug: "resonance",
       category: "Fashion",
+      labels: [
+        { name: "Fashion", slug: "fashion", visible: true },
+        { name: "Reels", slug: "reels", visible: false },
+      ],
       story: ["First paragraph.", "Second paragraph."],
       credits: [{ role: "Editor", name: "Ashyan Zafar" }],
       cover: { src: "https://cdn/c.webp", alt: "Cover", blurDataUrl: "data:x" },

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { FieldDef } from "@/features/admin/fields";
+import { listLabels, type LabelRow } from "@/features/labels/actions";
 import { MediaPicker } from "./media-picker";
 
 type Obj = Record<string, unknown>;
@@ -191,7 +192,72 @@ function Field({
       );
     case "list":
       return <ListField def={def} value={(value as Obj[]) ?? []} onChange={onChange} path={path} errors={errors} />;
+    case "labels":
+      return (
+        <div>
+          {label}
+          <LabelsSetting id={id} value={(value as "auto" | string[] | undefined) ?? "auto"} onChange={onChange} />
+          {help}
+          {err}
+        </div>
+      );
   }
+}
+
+/** "auto", or a hand-picked, ordered subset of the managed labels. */
+function LabelsSetting({ id, value, onChange }: { id: string; value: "auto" | string[]; onChange: (v: unknown) => void }) {
+  const [all, setAll] = useState<LabelRow[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    listLabels()
+      .then((rows) => live && setAll(rows))
+      .catch(() => live && setAll([]));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const auto = value === "auto";
+  const picked = auto ? [] : value;
+  return (
+    <div className="space-y-3 rounded-md border border-border p-3">
+      <div className="flex items-center justify-between gap-4">
+        <Label htmlFor={id} className="text-sm">
+          Automatic (all visible labels)
+        </Label>
+        <Switch
+          id={id}
+          checked={auto}
+          onCheckedChange={(c) => onChange(c ? "auto" : (all ?? []).filter((l) => l.visible).map((l) => l.slug))}
+        />
+      </div>
+      {!auto ? (
+        all === null ? (
+          <p className="text-xs text-muted-foreground">Loading labels…</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {all.map((l) => {
+              const on = picked.includes(l.slug);
+              return (
+                <li key={l.id}>
+                  <label className="flex items-center gap-1.5 rounded border border-border px-2 py-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={(e) =>
+                        onChange(e.target.checked ? [...picked, l.slug] : picked.filter((s) => s !== l.slug))
+                      }
+                    />
+                    {l.name}
+                    {!l.visible ? <span className="text-xs text-muted-foreground">(hidden)</span> : null}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : null}
+    </div>
+  );
 }
 
 function ListField({

@@ -10,6 +10,7 @@ import type { AssetSummary } from "@/features/media/summary";
 import { deleteProject, saveProject, type ProjectInput } from "@/features/projects/actions";
 import { AssetField, GalleryField } from "./asset-field";
 import { ConfirmButton } from "./confirm-button";
+import { LabelPicker, type PickedLabel } from "./label-picker";
 import { YouTubeFilmField, type YouTubeFilmValue } from "./youtube-film-field";
 import { SchemaForm } from "./schema-form";
 
@@ -17,7 +18,6 @@ const contentFields: FieldDef[] = [
   { type: "text", name: "title", label: "Title" },
   { type: "text", name: "slug", label: "URL slug", help: "Leave empty to generate from the title. Changing it changes the page URL." },
   { type: "text", name: "format", label: "Format", placeholder: "Brand Film" },
-  { type: "text", name: "category", label: "Category (filter chip)", placeholder: "Commercial", help: "Should match one of the work grid's filter chips." },
   { type: "text", name: "clientName", label: "Client" },
   { type: "number", name: "year", label: "Year", min: 1990, max: 2100 },
   { type: "text", name: "role", label: "Your role", placeholder: "Edit · Colour · Sound design" },
@@ -51,15 +51,25 @@ const seoFields: FieldDef[] = [
 
 export type ProjectFormValue = Omit<
   ProjectInput,
-  "coverId" | "loopId" | "galleryIds" | "filmUrl" | "filmOrientation" | "filmAspect" | "filmRuntime"
+  "coverId" | "loopId" | "galleryIds" | "labelIds" | "filmUrl" | "filmOrientation" | "filmAspect" | "filmRuntime"
 > &
   YouTubeFilmValue & {
   cover: AssetSummary | null;
   loop: AssetSummary | null;
+  labels: PickedLabel[];
   gallery: AssetSummary[];
 };
 
-export function ProjectForm({ id, initial }: { id: string | null; initial: ProjectFormValue }) {
+export function ProjectForm({
+  id,
+  initial,
+  labelOptions,
+}: {
+  id: string | null;
+  initial: ProjectFormValue;
+  labelOptions: PickedLabel[];
+}) {
+  const [options, setOptions] = useState(labelOptions);
   const router = useRouter();
   const [value, setValue] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -68,13 +78,14 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
 
   function save(status?: ProjectFormValue["status"]) {
     startTransition(async () => {
-      const { cover, loop, gallery, ...rest } = value;
+      const { cover, loop, gallery, labels, ...rest } = value;
       const res = await saveProject(id, {
         ...rest,
         status: status ?? rest.status,
         coverId: cover?.id ?? null,
         loopId: loop?.id ?? null,
         galleryIds: gallery.map((g) => g.id),
+        labelIds: labels.map((l) => l.id),
       });
       if (!res.ok) {
         setErrors(res.errors);
@@ -152,6 +163,15 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
             onChange={(v) => setValue(v as unknown as ProjectFormValue)}
             errors={errors}
           />
+          <div className="mt-6">
+            <LabelPicker
+              value={value.labels}
+              options={options}
+              onChange={(labels) => set({ labels })}
+              onCreated={(l) => setOptions((o) => [...o, l])}
+              error={errors.labelIds}
+            />
+          </div>
         </section>
         <section aria-label="Film" className="rounded-md border border-border bg-onyx p-5 xl:col-start-1">
           <YouTubeFilmField

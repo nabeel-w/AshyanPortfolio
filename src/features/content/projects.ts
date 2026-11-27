@@ -11,7 +11,8 @@ import {
   type VideoOrientation,
   type YouTubeKind,
 } from "@/lib/youtube";
-import { getWorkList, loopOf, type LoopRef, type WorkItem } from "./queries";
+import { neighbours, relatedWork } from "./neighbours";
+import { getPublishedProjects, getWorkList, loopOf, type LoopRef, type WorkItem } from "./queries";
 import { tags } from "./tags";
 
 export type MediaImage = { src: string; alt: string; width?: number; height?: number; blurDataUrl?: string };
@@ -40,7 +41,10 @@ export type ProjectDetail = {
   clientName?: string;
   year: number;
   role?: string;
+  /** Primary label's name ("Film" when there is none): OG meta line, breadcrumbs in plain text */
   category: string;
+  /** In order; the first is the primary label. Hidden labels show as text (they have no page). */
+  labels: ProjectLabelRef[];
   summary: string;
   /** Paragraphs */
   story: string[];
@@ -56,8 +60,14 @@ export type ProjectDetail = {
   seoDescription?: string;
   publishedAt?: Date;
   updatedAt?: Date;
-  next?: { slug: string; title: string; cover: MediaImage };
+  /** Neighbours in grid order (wrapping); prev is omitted when there are only two films */
+  prev?: WorkItem;
+  next?: WorkItem;
+  /** "More in <primary label>": up to 3 other films (shared primary label, then any label, then latest) */
+  related: WorkItem[];
 };
+
+export type ProjectLabelRef = { name: string; slug: string; visible: boolean };
 
 /** <title> and meta description: the admin SEO fields win, then "Title — Format" and the summary. */
 export function projectMeta(p: Pick<ProjectDetail, "title" | "format" | "summary" | "seoTitle" | "seoDescription">) {
@@ -125,15 +135,15 @@ export async function getProjectSlugs(): Promise<string[]> {
 
 export async function getProject(slug: string): Promise<ProjectDetail | null> {
   "use cache";
-  cacheTag(tags.project(slug), tags.projects);
+  cacheTag(tags.project(slug), tags.projects, tags.labels);
   cacheLife("max");
 
   const p = await db.project.findFirst({
     where: { slug, status: "PUBLISHED" },
     include: {
-      category: true,
       cover: true,
       loop: true,
+      labels: { include: { label: true }, orderBy: { order: "asc" } },
       gallery: { include: { asset: true }, orderBy: { order: "asc" } },
     },
   });
@@ -142,14 +152,13 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
   const cover = image(p.cover);
   if (!cover) return null;
 
-  const siblings = await db.project.findMany({
-    where: { status: "PUBLISHED", cover: { status: "READY" } },
-    orderBy: [{ featured: "desc" }, { order: "asc" }, { publishedAt: "desc" }],
-    select: { slug: true, title: true, cover: true },
-  });
-  const i = siblings.findIndex((s) => s.slug === slug);
-  const nextRow = siblings.length > 1 ? siblings[(i + 1) % siblings.length] : undefined;
-  const nextCover = image(nextRow?.cover);
+  // Same cached list the grids use, so prev/next and related always match the visible order.
+  const list = await getPublishedProjects();
+  const labels: ProjectLabelRef[] = p.labels.map((pl) => ({
+    name: pl.label.name,
+    slug: pl.label.slug,
+    visible: pl.label.visible,
+  }));
 
   return {
     slug: p.slug,
@@ -158,7 +167,8 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     clientName: p.clientName ?? undefined,
     year: p.year ?? p.createdAt.getFullYear(),
     role: p.role ?? undefined,
-    category: p.category?.name ?? "Film",
+    category: labels[0]?.name ?? "Film",
+    labels,
     summary: p.summary ?? "",
     story: paragraphs(p.story),
     transcript: p.transcript?.trim() || undefined,
@@ -171,7 +181,12 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     seoDescription: p.seoDescription?.trim() || undefined,
     publishedAt: p.publishedAt ?? undefined,
     updatedAt: p.updatedAt,
-    next: nextRow && nextCover ? { slug: nextRow.slug, title: nextRow.title, cover: nextCover } : undefined,
+    ...neighbours(list, p.slug),
+    related: relatedWork(
+      list,
+      p.slug,
+      labels.filter((l) => l.visible).map((l) => l.slug),
+    ),
   };
 }
 
@@ -181,18 +196,23 @@ async function fallbackProject(slug: string): Promise<ProjectDetail | null> {
   const i = list.findIndex((p) => p.slug === slug);
   const p: WorkItem | undefined = list[i];
   if (!p) return null;
-  const next = list.length > 1 ? list[(i + 1) % list.length] : undefined;
   return {
     slug: p.slug,
     title: p.title,
     format: p.format,
     year: p.year,
-    category: p.category,
+    category: p.labels[0]?.name ?? "Film",
+    labels: p.labels.map((l) => ({ ...l, visible: true })),
     summary: `${p.title} — ${p.format.toLowerCase()} edited by Ashyan Zafar.`,
     story: [],
     credits: [],
     cover: p.cover,
     gallery: [],
-    next: next ? { slug: next.slug, title: next.title, cover: next.cover } : undefined,
+    ...neighbours(list, p.slug),
+    related: relatedWork(
+      list,
+      p.slug,
+      p.labels.map((l) => l.slug),
+    ),
   };
 }

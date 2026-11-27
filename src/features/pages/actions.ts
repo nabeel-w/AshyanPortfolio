@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { pageSections } from "@/content/fallback";
 import { invalidate } from "@/features/content/invalidate";
-import { sectionSchemas, type SectionType } from "@/features/sections/schemas";
+import { upgradeSectionData, sectionSchemas, type SectionType } from "@/features/sections/schemas";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 
@@ -85,7 +85,9 @@ export async function publishPage(pageId: string, note?: string) {
   const session = await requireAdmin();
   const page = await db.page.findUniqueOrThrow({ where: { id: id.parse(pageId) }, include: { sections: true } });
 
-  const invalid = page.sections.filter((s) => !sectionSchemas[s.type as SectionType]?.safeParse(s.data).success);
+  const invalid = page.sections.filter(
+    (s) => !sectionSchemas[s.type as SectionType]?.safeParse(upgradeSectionData(s.type, s.data)).success,
+  );
   if (invalid.length) {
     return { ok: false as const, error: `Fix ${invalid.length} section(s) with invalid content before publishing.` };
   }

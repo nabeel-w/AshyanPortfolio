@@ -10,12 +10,13 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
   // authorize itself rather than rely on the layout guard. Also makes the page request-time.
   await requireAdmin();
   const { id } = await params;
+  const labelOptions = await db.label.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }], select: { id: true, name: true, slug: true } });
   const p = await db.project.findUnique({
     where: { id },
     include: {
       cover: true,
       loop: true,
-      category: true,
+      labels: { include: { label: true }, orderBy: { order: "asc" } },
       gallery: { include: { asset: true }, orderBy: { order: "asc" } },
     },
   });
@@ -24,11 +25,12 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
   return (
     <ProjectForm
       id={p.id}
+      labelOptions={labelOptions}
       initial={{
         title: p.title,
         slug: p.slug,
         format: p.format ?? "",
-        category: p.category?.name ?? "",
+        labels: p.labels.map((pl) => ({ id: pl.label.id, name: pl.label.name, slug: pl.label.slug })),
         clientName: p.clientName ?? "",
         year: p.year ?? undefined,
         role: p.role ?? "",

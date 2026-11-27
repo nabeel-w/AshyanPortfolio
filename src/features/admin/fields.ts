@@ -22,6 +22,8 @@ export type FieldDef =
   | (Base & { type: "list"; item: FieldDef[]; itemTitle?: string; addLabel?: string; newItem: Record<string, unknown> })
   /** Nested object */
   | (Base & { type: "group"; fields: FieldDef[] })
+  /** Work-grid chips: "auto" (every visible label with work) or a chosen list of label slugs */
+  | (Base & { type: "labels" })
   /** Read-only hint shown inside the form */
   | { type: "note"; name: string; text: string };
 
@@ -77,7 +79,13 @@ export const sectionFields: Record<SectionType, FieldDef[]> = {
   ],
   workGrid: [
     { type: "text", name: "label", label: "Heading", help: "The last word becomes the red italic accent." },
-    { type: "lines", name: "categories", label: "Filter chips", help: "One per line. The first one shows everything." },
+    {
+      type: "labels",
+      name: "labels",
+      label: "Label chips",
+      help: "Automatic shows every visible label that has work, in the order set in Admin → Labels. On /work the chips filter in place; elsewhere they open the label pages.",
+    },
+    { type: "number", name: "limit", label: "Show at most (films)", min: 1, max: 60, help: "Optional. Use it for a home-page teaser; an “All work →” link appears when there are more." },
     tone,
     { type: "note", name: "projectsNote", text: "Films come from Admin → Projects (published, featured first)." },
   ],

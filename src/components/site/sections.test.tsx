@@ -41,27 +41,42 @@ describe("<Hero>", () => {
 describe("<WorkGrid>", () => {
   const props = data("workGrid");
 
-  it("lists every project as a link to its film page", () => {
-    render(<WorkGrid {...props} />);
-    const links = screen.getAllByRole("link");
-    expect(links).toHaveLength(props.projects.length);
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(
-      props.projects.map((p) => `/work/${p.slug}`),
-    );
+  const cards = (container: HTMLElement) => [...container.querySelectorAll("article")];
+
+  it("gives every card one title link to its film page (a stretched link)", () => {
+    const { container } = render(<WorkGrid {...props} />);
+    const titles = cards(container).map((a) => within(a).getByRole("heading", { level: 3 }).querySelector("a")!);
+    expect(titles.map((l) => l.getAttribute("href"))).toEqual(props.projects.map((p) => `/work/${p.slug}`));
+    expect(titles[0]!.className).toContain("after:inset-0");
   });
 
-  it("shows title, format · year and a zero-padded index for each card", () => {
-    render(<WorkGrid {...props} />);
-    const first = screen.getAllByRole("link")[0]!;
-    expect(within(first).getByRole("heading", { level: 3 })).toHaveTextContent("The Next Chapter");
-    expect(first).toHaveTextContent("Brand Film · 2024");
+  it("shows the index, title, label tags (as links) and year on each card", () => {
+    const { container } = render(<WorkGrid {...props} />);
+    const first = cards(container)[0]!;
     expect(first).toHaveTextContent("01");
+    expect(first).toHaveTextContent("The Next Chapter");
+    expect(first).toHaveTextContent("2024");
+    expect(within(first).getByRole("link", { name: "Commercial" })).toHaveAttribute("href", "/work/label/commercial");
   });
 
-  it("marks cards as blade-cursor PLAY targets", () => {
-    render(<WorkGrid {...props} />);
-    for (const link of screen.getAllByRole("link"))
-      expect(link).toHaveAttribute("data-cursor", "play");
+  it("never nests a link inside another link (#28)", () => {
+    const { container } = render(<WorkGrid {...props} />);
+    expect(container.querySelectorAll("a a")).toHaveLength(0);
+  });
+
+  it("marks each frame as a blade-cursor PLAY target and the article as the hover-loop scope", () => {
+    const { container } = render(<WorkGrid {...props} />);
+    for (const card of cards(container)) {
+      expect(card).toHaveAttribute("data-loop-scope");
+      expect(card.querySelector('[data-cursor="play"]')).not.toBeNull();
+    }
+  });
+
+  it("tags each item with its label slugs for in-place filtering", () => {
+    const { container } = render(<WorkGrid {...props} />);
+    expect([...container.querySelectorAll("li[data-labels]")].map((li) => li.getAttribute("data-labels"))).toEqual(
+      props.projects.map((p) => p.labels.map((l) => l.slug).join(" ")),
+    );
   });
 
   it("loads the first two covers eagerly and the rest lazily", () => {
@@ -75,15 +90,27 @@ describe("<WorkGrid>", () => {
     ]);
   });
 
-  it("renders the filter chips with the first one active", () => {
+  it("renders label chips as real links with counts (no JS needed)", () => {
     render(<WorkGrid {...props} />);
     const nav = screen.getByRole("navigation", { name: /filter work/i });
-    expect(
-      within(nav)
-        .getAllByRole("listitem")
-        .map((li) => li.textContent),
-    ).toEqual(props.categories);
-    expect(within(nav).getByText("All")).toHaveClass("text-foreground");
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([
+      "/work",
+      "/work/label/commercial",
+      "/work/label/fashion",
+      "/work/label/film",
+      "/work/label/documentary",
+    ]);
+    expect(within(nav).getByRole("link", { name: /Commercial/ })).toHaveTextContent("02");
+    expect(within(nav).getByRole("link", { name: /Commercial/ })).toHaveAttribute("data-cta", "label:commercial");
+    // On the home teaser no chip is "current": they navigate to label pages.
+    expect(nav.querySelector("[aria-current]")).toBeNull();
+  });
+
+  it("marks the active chip on a label page", () => {
+    render(<WorkGrid {...props} activeLabel="fashion" />);
+    const nav = screen.getByRole("navigation", { name: /filter work/i });
+    expect(within(nav).getByRole("link", { name: /Fashion/ })).toHaveAttribute("aria-current", "page");
   });
 
   it("uses the black tone by default and paper when asked", () => {

@@ -193,6 +193,42 @@ enum VideoOrientation {
   SQUARE
 }
 
+/// A managed work label ("Fashion", "Reels"…). Several per project; each visible label with work has
+/// an indexable page at /work/label/<slug>. See docs/02 "Labels".
+model Label {
+  id             String         @id @default(cuid())
+  name           String
+  slug           String         @unique
+  /// Old slugs after a rename: /work/label/<old> permanently redirects to the current slug
+  previousSlugs  String[]       @default([])
+  /// 1–2 sentence intro for the landing page (crawlable, GEO)
+  description    String?
+  order          Int            @default(0)
+  /// Hidden = not a chip and no landing page, but still on its projects
+  visible        Boolean        @default(true)
+  seoTitle       String?
+  seoDescription String?
+  projects       ProjectLabel[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([order])
+}
+
+model ProjectLabel {
+  projectId String
+  labelId   String
+  /// 0 = primary (card tag, breadcrumb, related work)
+  order     Int     @default(0)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, labelId])
+  @@index([labelId])
+  @@index([projectId, order])
+}
+
+/// Legacy single category per project, replaced by Label (#28). Dropped once labels are verified.
 model Category {
   id       String    @id @default(cuid())
   name     String
@@ -245,6 +281,7 @@ model Project {
   loop        Asset?        @relation("ProjectLoop", fields: [loopId], references: [id], onDelete: SetNull)
 
   gallery     ProjectMedia[]
+  labels      ProjectLabel[]
 
   seoTitle       String?
   seoDescription String?

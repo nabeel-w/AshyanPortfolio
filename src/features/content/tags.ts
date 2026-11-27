@@ -8,5 +8,7 @@ export const tags = {
   projects: "projects",
   project: (slug: string) => `project:${slug}`,
   clients: "clients",
+  labels: "labels",
+  label: (slug: string) => `label:${slug}`,
   assets: "assets",
 } as const;
