@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  completeUploadAction,
   deleteAssetAction,
   importProgressAction,
   listAssetsAction,
@@ -17,7 +16,7 @@ import { clockDuration } from "@/features/media/delivery";
 import type { AssetSummary } from "@/features/media/summary";
 import { cn } from "@/lib/utils";
 import { ConfirmButton } from "./confirm-button";
-import { assetThumb } from "./media-picker";
+import { AssetThumb } from "./media-picker";
 import { UploadDialog } from "./upload/upload-dialog";
 import { useUploadQueue } from "./upload/use-upload-queue";
 
@@ -43,21 +42,15 @@ export function MediaLibrary({
   );
   const queue = useUploadQueue({ onChange: refresh });
 
-  // Streaming video is transcoded at the provider and Drive imports fill server-side.
-  // Webhooks can't reach localhost, so poll while anything is still moving.
-  const processing = assets.filter((a) => a.status === "PROCESSING").map((a) => a.id);
+  // Drive imports fill server-side: poll their progress while any is running (Blob uploads are READY at once).
   const importing = assets.filter((a) => a.import?.status === "RUNNING").map((a) => a.id);
-  const moving = [...processing, ...importing].join(",");
+  const moving = importing.join(",");
   useEffect(() => {
     if (!moving) return;
-    const t = setInterval(
-      async () => {
-        if (importing.length) await importProgressAction(importing).catch(() => null);
-        for (const id of processing) await completeUploadAction(id).catch(() => null);
-        refresh();
-      },
-      importing.length ? 2500 : 4000,
-    );
+    const t = setInterval(async () => {
+      await importProgressAction(importing).catch(() => null);
+      refresh();
+    }, 2500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-subscribe only when the moving set changes
   }, [moving]);
@@ -115,13 +108,7 @@ export function MediaLibrary({
               >
                 <span className="relative block aspect-video bg-graphite">
                   {a.status === "READY" ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- admin thumbnail, any provider host
-                    <img
-                      src={assetThumb(a)}
-                      alt={a.alt}
-                      loading="lazy"
-                      className="size-full object-cover"
-                    />
+                    <AssetThumb asset={a} alt={a.alt} className="size-full object-cover" />
                   ) : (
                     <TileStatus asset={a} />
                   )}
@@ -212,8 +199,7 @@ function AssetPanel({
   return (
     <div className="space-y-4 rounded-md border border-border bg-onyx p-4">
       {asset.status === "READY" ? (
-        // eslint-disable-next-line @next/next/no-img-element -- admin preview
-        <img src={assetThumb(asset)} alt="" className="aspect-video w-full rounded object-cover" />
+        <AssetThumb asset={asset} className="aspect-video w-full rounded object-cover" />
       ) : (
         <div className="aspect-video w-full overflow-hidden rounded bg-graphite">
           <TileStatus asset={asset} />

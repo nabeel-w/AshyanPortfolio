@@ -12,9 +12,9 @@ export function ClientMarquee({ label, speed, clients }: SectionProps<"clientMar
 
   return (
     <section aria-label={label} className="border-y border-hairline bg-ink py-6 md:py-8">
-      <div data-reveal className="container-site mb-4 flex items-center justify-between md:mb-5">
+      {/* Label only: the client asked for no client count on the public site (#23). */}
+      <div data-reveal className="container-site mb-4 md:mb-5">
         <p className="label text-smoke">{label}</p>
-        <p className="label text-smoke tabular-nums">{String(clients.length).padStart(2, "0")} Clients</p>
       </div>
       <div className="group relative overflow-hidden mask-x-from-90% mask-x-to-100% motion-reduce:overflow-x-auto">
         <ul

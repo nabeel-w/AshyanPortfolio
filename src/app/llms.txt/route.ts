@@ -1,4 +1,4 @@
-import { getSite, getWorkList } from "@/features/content/queries";
+import { getLabels, getSite, getWorkList } from "@/features/content/queries";
 import { profileUrls } from "@/features/seo/json-ld";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -7,7 +7,8 @@ import { absoluteUrl } from "@/lib/site-url";
  * Built from cached queries (tags "site" + "projects"), so it prerenders and refreshes on publish.
  */
 export async function GET() {
-  const [site, projects] = await Promise.all([getSite(), getWorkList()]);
+  const [site, projects, labels] = await Promise.all([getSite(), getWorkList(), getLabels()]);
+  const withWork = labels.filter((l) => l.count > 0);
 
   const body = [
     `# ${site.name}`,
@@ -19,8 +20,18 @@ export async function GET() {
     `- Contact: ${site.email}`,
     "",
     "## Selected work",
-    ...projects.map((p) => `- [${p.title}](${absoluteUrl(`/work/${p.slug}`)}): ${p.format}, ${p.year}`),
+    ...projects.map(
+      (p) =>
+        `- [${p.title}](${absoluteUrl(`/work/${p.slug}`)}): ${p.format}, ${p.year}${p.labels.length ? ` (${p.labels.map((l) => l.name).join(", ")})` : ""}`,
+    ),
     "",
+    ...(withWork.length
+      ? [
+          "## Work by label",
+          ...withWork.map((l) => `- [${l.name}](${absoluteUrl(`/work/label/${l.slug}`)}): ${l.count} ${l.count === 1 ? "film" : "films"}`),
+          "",
+        ]
+      : []),
     "## Pages",
     `- [About](${absoluteUrl("/about")}): biography, services and Q&A`,
     `- [Work](${absoluteUrl("/work")}): all films`,

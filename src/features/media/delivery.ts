@@ -1,14 +1,4 @@
-/**
- * Client-safe delivery URLs for streamed video. Only Mux is wired today; other streaming providers
- * store equivalent URLs in Asset.url / Asset.meta at finalize time.
- */
-export const mux = {
-  poster: (playbackId: string, time = 1, width?: number) =>
-    `https://image.mux.com/${playbackId}/thumbnail.webp?time=${time}${width ? `&width=${width}` : ""}`,
-  hls: (playbackId: string) => `https://stream.mux.com/${playbackId}.m3u8`,
-  /** Static MP4 rendition (requested at upload as resolution "highest"). Used for short muted loops. */
-  mp4: (playbackId: string) => `https://stream.mux.com/${playbackId}/highest.mp4`,
-};
+/** Client-safe duration formatting for films (YouTube) and loops. */
 
 /** 125.4 → "PT2M5S" (schema.org duration). */
 export function isoDuration(seconds: number): string {

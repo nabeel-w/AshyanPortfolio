@@ -5,6 +5,7 @@ import { invalidate } from "@/features/content/invalidate";
 import { googleAccountFor } from "@/features/google/accounts";
 import { requireAdmin } from "@/lib/session";
 import * as imports from "./import";
+import { cleanProbe, type MediaProbe } from "./probe";
 import * as media from "./service";
 import { toAssetSummary } from "./summary";
 
@@ -14,6 +15,7 @@ const uploadRequest = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(100),
   bytes: z.number().int().positive(),
+  purpose: z.enum(["loop"]).optional(),
 });
 
 export async function createUploadAction(input: z.input<typeof uploadRequest>) {
@@ -21,18 +23,19 @@ export async function createUploadAction(input: z.input<typeof uploadRequest>) {
   return media.createUpload(uploadRequest.parse(input));
 }
 
-export async function completeUploadAction(assetId: string) {
+/** `probe`: width/height/duration the browser read from a video before uploading it (#24). */
+export async function completeUploadAction(assetId: string, probe?: MediaProbe) {
   await requireAdmin();
-  const asset = await media.completeUpload(z.string().cuid().parse(assetId));
+  const asset = await media.completeUpload(z.string().cuid().parse(assetId), cleanProbe(probe));
   if (asset.status === "READY") invalidate.assets();
   return {
     id: asset.id,
     kind: asset.kind,
     status: asset.status,
     url: asset.url,
-    playbackId: asset.playbackId,
     width: asset.width,
     height: asset.height,
+    duration: asset.duration,
   };
 }
 
@@ -93,15 +96,18 @@ const driveIds = z
 export type DriveImportResult = { fileId: string; assetId?: string; error?: string };
 
 /** Import files the admin just picked in the Google Picker. Each becomes an UPLOADING asset that fills server-side. */
-export async function importFromDriveAction(fileIds: string[]): Promise<DriveImportResult[]> {
+export async function importFromDriveAction(fileIds: string[], purpose?: "loop"): Promise<DriveImportResult[]> {
   const session = await requireAdmin();
   const ids = driveIds.parse(fileIds);
+  const why = z.enum(["loop"]).optional().parse(purpose);
   const account = await googleAccountFor("drive", session.user.id);
   if (!account) throw new Error("Connect Google Drive first.");
   const results: DriveImportResult[] = [];
   for (const fileId of ids) {
     try {
-      const assetId = await imports.createDriveImport(account.id, fileId);
+      const assetId = why
+        ? await imports.createDriveImport(account.id, fileId, why)
+        : await imports.createDriveImport(account.id, fileId);
       await imports.kickImport(assetId);
       results.push({ fileId, assetId });
     } catch (e) {

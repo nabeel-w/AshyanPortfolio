@@ -35,3 +35,29 @@ describe("section schemas", () => {
     expect(Object.keys(sectionRegistry).sort()).toEqual(Object.keys(sectionSchemas).sort());
   });
 });
+
+describe("legacy work-grid data (#28)", () => {
+  it("turns the old default chip list into 'auto' and a custom list into label slugs", async () => {
+    const { upgradeSectionData } = await import("./schemas");
+    const old = { label: "Work", categories: ["All", "Commercial", "Fashion", "Film", "Documentary"] };
+    expect(workGridSchema.parse(upgradeSectionData("workGrid", old))).toMatchObject({ labels: "auto" });
+    const custom = { categories: ["Everything", "Music Video", "Fashion"] };
+    expect(workGridSchema.parse(upgradeSectionData("workGrid", custom)).labels).toEqual(["music-video", "fashion"]);
+  });
+
+  it("gives each stored project its old category as its only label", async () => {
+    const { upgradeSectionData } = await import("./schemas");
+    const out = upgradeSectionData("workGrid", {
+      projects: [{ slug: "a", title: "A", format: "F", year: 2024, category: "Fashion Film", cover: { src: "/a.webp" } }],
+    }) as { projects: { labels: unknown[] }[] };
+    expect(out.projects[0]!.labels).toEqual([{ name: "Fashion Film", slug: "fashion-film" }]);
+    expect(out.projects[0]).not.toHaveProperty("category");
+  });
+
+  it("leaves other sections and already-upgraded data alone", async () => {
+    const { upgradeSectionData } = await import("./schemas");
+    const hero = { headline: "x" };
+    expect(upgradeSectionData("hero", hero)).toBe(hero);
+    expect(upgradeSectionData("workGrid", { labels: ["fashion"] })).toEqual({ labels: ["fashion"] });
+  });
+});

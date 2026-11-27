@@ -15,6 +15,15 @@ export function maxBytes(kind: MediaKind): number {
   return mb * 1024 * 1024;
 }
 
+/** Hover loops: short muted MP4/WebM clips on the grid (#26). Override the cap with MEDIA_MAX_LOOP_MB. */
+export const LOOP_MIME_TYPES = ["video/mp4", "video/webm"] as const;
+export function maxLoopBytes(): number {
+  return Number(process.env.MEDIA_MAX_LOOP_MB || 20) * 1024 * 1024;
+}
+
+/** Why a file is being added; it tightens the rules (a loop must be a small MP4/WebM). */
+export type UploadPurpose = "loop";
+
 /** "image/2026/11/hero-still-k3j2x9.webp" — readable, unique, URL-safe. */
 export function makeKey(kind: MediaKind, filename: string, now = new Date()): string {
   const dot = filename.lastIndexOf(".");
@@ -46,22 +55,6 @@ export function safeEqualHex(a: string, b: string): boolean {
   const x = Buffer.from(a, "hex");
   const y = Buffer.from(b, "hex");
   return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
-}
-
-/** Parse "t=123,v1=abc" / "time=123,sig1=abc" style signature headers. */
-export function parseSigHeader(header: string | null): Record<string, string> {
-  return Object.fromEntries(
-    (header ?? "")
-      .split(",")
-      .map((part) => part.trim().split("="))
-      .filter((kv): kv is [string, string] => kv.length === 2 && !!kv[0] && !!kv[1]),
-  );
-}
-
-/** Reject webhooks older than 5 minutes (replay protection). */
-export function freshTimestamp(seconds: string | undefined, toleranceSec = 300): boolean {
-  const t = Number(seconds);
-  return Number.isFinite(t) && Math.abs(Date.now() / 1000 - t) <= toleranceSec;
 }
 
 export async function expectOk(res: Response, what: string): Promise<Response> {

@@ -36,6 +36,16 @@ const img = (name: string, width: number, height: number, alt: string) => ({
   alt,
 });
 
+/** Stand-in labels (the Label table replaces these once it has rows). */
+const L = {
+  commercial: { name: "Commercial", slug: "commercial" },
+  fashion: { name: "Fashion", slug: "fashion" },
+  film: { name: "Film", slug: "film" },
+  documentary: { name: "Documentary", slug: "documentary" },
+  reels: { name: "Reels", slug: "reels" },
+  music: { name: "Music video", slug: "music-video" },
+};
+
 export const homeSections: SectionData[] = [
   {
     id: "hero",
@@ -76,13 +86,17 @@ export const homeSections: SectionData[] = [
     data: {
       label: "Selected work",
       tone: "ink",
-      categories: ["All", "Commercial", "Fashion", "Film", "Documentary"],
+      labels: "auto",
+      chips: "links",
+      labelList: [],
       projects: [
-        { slug: "the-next-chapter", title: "The Next Chapter", format: "Brand Film", year: 2024, category: "Commercial", cover: img("next-chapter", 1672, 941, "Extreme close-up of an eye under dappled leaf shadows with a red glint") },
-        { slug: "drive-further", title: "Drive Further", format: "Commercial", year: 2024, category: "Commercial", cover: img("drive-further", 1672, 941, "Black sports car under a concrete bridge at night, red tail light on wet asphalt") },
-        { slug: "resonance", title: "Résonance", format: "Fashion Film", year: 2023, category: "Fashion", cover: img("resonance", 1672, 941, "Model in a flowing red silk dress on a black-sand coastline") },
-        { slug: "the-silent-ones", title: "The Silent Ones", format: "Short Film", year: 2023, category: "Film", cover: img("silent-ones", 1672, 941, "Profile silhouette of a man in backlit smoke") },
-        { slug: "mumbai-my-city", title: "Mumbai, My City", format: "Documentary", year: 2022, category: "Documentary", cover: img("mumbai", 1672, 941, "Mumbai skyline at blue hour with red aircraft lights on the towers") },
+        { slug: "the-next-chapter", title: "The Next Chapter", format: "Brand Film", year: 2024, labels: [L.commercial], featured: true, orientation: "landscape", cardSize: "auto", cover: img("next-chapter", 1672, 941, "Extreme close-up of an eye under dappled leaf shadows with a red glint") },
+        { slug: "night-shift", title: "Night Shift", format: "Reel", year: 2025, labels: [L.reels, L.fashion], featured: true, orientation: "portrait", cardSize: "auto", cover: img("night-shift", 529, 941, "A woman in a red silk dress turns into the wind against a grey sky") },
+        { slug: "monsoon", title: "Monsoon", format: "Reel", year: 2025, labels: [L.reels, L.music], featured: true, orientation: "portrait", cardSize: "auto", cover: img("monsoon", 529, 941, "Mumbai towers under heavy monsoon cloud at dusk") },
+        { slug: "resonance", title: "Résonance", format: "Fashion Film", year: 2023, labels: [L.fashion], featured: false, orientation: "landscape", cardSize: "auto", cover: img("resonance", 1672, 941, "Model in a flowing red silk dress on a black-sand coastline") },
+        { slug: "drive-further", title: "Drive Further", format: "Commercial", year: 2024, labels: [L.commercial], featured: false, orientation: "landscape", cardSize: "auto", cover: img("drive-further", 1672, 941, "Black sports car under a concrete bridge at night, red tail light on wet asphalt") },
+        { slug: "the-silent-ones", title: "The Silent Ones", format: "Short Film", year: 2023, labels: [L.film], featured: false, orientation: "landscape", cardSize: "auto", cover: img("silent-ones", 1672, 941, "Profile silhouette of a man in backlit smoke") },
+        { slug: "mumbai-my-city", title: "Mumbai, My City", format: "Documentary", year: 2022, labels: [L.documentary], featured: false, orientation: "landscape", cardSize: "auto", cover: img("mumbai", 1672, 941, "Mumbai skyline at blue hour with red aircraft lights on the towers") },
       ],
     },
   },
@@ -137,7 +151,7 @@ export const pageSections: Record<"home" | "work" | "about" | "contact", Section
           "Commercials, fashion films, documentaries and short films — edited for pace, performance and the quiet moments between.",
       },
     },
-    { ...workGrid, id: "work-grid", data: { ...workGrid.data, label: "All work" } } as SectionData,
+    { ...workGrid, id: "work-grid", data: { ...workGrid.data, label: "All work", chips: "filter" } } as SectionData,
   ],
   about: [
     {

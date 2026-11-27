@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { getSite } from "@/features/content/queries";
+import { titleTemplateFor } from "@/features/seo/share";
+import { getShareSettings, shareImages } from "@/features/seo/share-server";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
@@ -33,14 +35,21 @@ const mono = localFont({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const site = await getSite();
+  const [site, share, images] = await Promise.all([
+    getSite(),
+    getShareSettings(),
+    shareImages({ kind: "page", slug: "home" }),
+  ]);
+  const description = share.defaultDescription || site.description;
+  const handle = share.twitterHandle ? `@${share.twitterHandle.replace(/^@/, "")}` : undefined;
   return {
     metadataBase: new URL(SITE_URL),
     title: {
       default: `${site.name} — ${site.role}`,
-      template: `%s — ${site.name}`,
+      // Settings → Sharing & SEO (#33); "%s — {name}" by default
+      template: titleTemplateFor(share, site.name),
     },
-    description: site.description,
+    description,
     applicationName: site.name,
     authors: [{ name: site.name, url: SITE_URL }],
     creator: site.name,
@@ -51,9 +60,10 @@ export async function generateMetadata(): Promise<Metadata> {
       locale: "en",
       url: "/",
       title: `${site.name} — ${site.role}`,
-      description: site.description,
+      description,
+      images: images.openGraph,
     },
-    twitter: { card: "summary_large_image" },
+    twitter: { card: "summary_large_image", images: images.twitter, site: handle, creator: handle },
     robots: { index: true, follow: true, "max-image-preview": "large", "max-video-preview": -1 },
   };
 }

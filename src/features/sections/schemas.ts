@@ -7,11 +7,18 @@ import { z } from "zod";
  */
 
 export const mediaRef = z.object({
-  src: z.string(), // asset URL (image) or playback id (video)
+  src: z.string(), // asset URL
   alt: z.string().default(""),
   width: z.number().int().optional(),
   height: z.number().int().optional(),
   blurDataUrl: z.string().optional(),
+});
+
+/** A hover loop: a short MP4/WebM URL plus its size (portrait loops fill tall tiles). */
+export const loopRef = z.object({
+  src: z.string(),
+  width: z.number().int().optional(),
+  height: z.number().int().optional(),
 });
 
 const link = z.object({ label: z.string(), href: z.string() });
@@ -22,8 +29,6 @@ export const heroSchema = z.object({
   headline: z.string().default("Crafting visual stories *through edit.*"),
   cta: link.default({ label: "View selected work", href: "#work" }),
   media: mediaRef,
-  /** Optional muted background loop (Mux playback id) */
-  videoPlaybackId: z.string().optional(),
 });
 
 export const clientMarqueeSchema = z.object({
@@ -33,9 +38,25 @@ export const clientMarqueeSchema = z.object({
   clients: z.array(z.object({ name: z.string(), logo: mediaRef.optional() })).default([]),
 });
 
+/** A label as shown on cards and chips (#28). */
+export const labelRef = z.object({ name: z.string(), slug: z.string() });
+
+/** URL-safe slug ("Music Video" → "music-video"). Shared by labels, projects and the legacy upgrade. */
+export const slugify = (s: string) =>
+  s
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+
 export const workGridSchema = z.object({
   label: z.string().default("Selected work"),
-  categories: z.array(z.string()).default(["All", "Commercial", "Fashion", "Film", "Documentary"]),
+  /** Which label chips to show: "auto" = every visible label that has work, in the admin order; or slugs */
+  labels: z.union([z.literal("auto"), z.array(z.string())]).default("auto"),
+  /** Show at most this many films (home teaser); an "All work →" link appears when there are more */
+  limit: z.number().int().min(1).max(60).optional(),
   projects: z
     .array(
       z.object({
@@ -43,14 +64,52 @@ export const workGridSchema = z.object({
         title: z.string(),
         format: z.string(),
         year: z.number().int(),
-        category: z.string(),
+        /** In order; the first is the primary label (card tag, breadcrumb) */
+        labels: z.array(labelRef).default([]),
         cover: mediaRef,
-        loopPlaybackId: z.string().optional(),
+        /** Short muted hover loop on Vercel Blob (#26) */
+        loop: loopRef.optional(),
+        /** The film's shape (#24): portrait reels get tall bento tiles */
+        orientation: z.enum(["landscape", "portrait", "square"]).default("landscape"),
+        /** Admin tile override (#29) */
+        cardSize: z.enum(["auto", "feature", "wide", "tall", "square"]).default("auto"),
+        featured: z.boolean().default(false),
       }),
     )
     .default([]),
+  /** Filled from the Label table when the page renders (chip rail with counts); not edited */
+  labelList: z.array(labelRef.extend({ count: z.number().int() })).default([]),
+  /** "filter" (/work: chips filter in place and sync ?label=) or "links" (chips go to label pages) */
+  chips: z.enum(["filter", "links"]).default("links"),
   tone: z.enum(["ink", "paper"]).default("ink"),
 });
+
+const LEGACY_DEFAULT_CHIPS = ["All", "Commercial", "Fashion", "Film", "Documentary"];
+
+/**
+ * Stored section data from before a schema change, upgraded on read (#28): the work grid's free-text
+ * `categories` chips become label slugs ("auto" when they were the old default), and each project's
+ * single `category` becomes its only label. Returns the input untouched for everything else.
+ */
+export function upgradeSectionData(type: string, data: unknown): unknown {
+  if (type !== "workGrid" || !data || typeof data !== "object") return data;
+  const d = { ...(data as Record<string, unknown>) };
+  if (Array.isArray(d.categories) && d.labels === undefined) {
+    const chips = d.categories.filter((c): c is string => typeof c === "string");
+    const isDefault = chips.length === LEGACY_DEFAULT_CHIPS.length && chips.every((c, i) => c === LEGACY_DEFAULT_CHIPS[i]);
+    d.labels = isDefault ? "auto" : chips.slice(1).map(slugify).filter(Boolean);
+  }
+  delete d.categories;
+  if (Array.isArray(d.projects)) {
+    d.projects = d.projects.map((p) => {
+      if (!p || typeof p !== "object") return p;
+      const { category, ...rest } = p as Record<string, unknown>;
+      if (rest.labels !== undefined || typeof category !== "string") return rest;
+      return { ...rest, labels: [{ name: category, slug: slugify(category) }] };
+    });
+  }
+  return d;
+}
 
 export const statementSchema = z.object({
   /** *italic red serif*, **SANS CAPS**, plain = serif */

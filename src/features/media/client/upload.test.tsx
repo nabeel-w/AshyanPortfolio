@@ -82,16 +82,6 @@ describe("uploadFile", () => {
     expect(asset).toMatchObject({ status: "READY" });
   });
 
-  it("form POST: wraps the file in multipart form data under the provider's field name", async () => {
-    actions.createUploadAction.mockResolvedValue({
-      assetId: "a",
-      upload: { strategy: "form-post", url: "https://upload.cf/x", fieldName: "file" },
-    });
-    await uploadFile(file);
-    expect(FakeXHR.last.method).toBe("POST");
-    expect((FakeXHR.last.body as FormData).get("file")).toBeInstanceOf(File);
-  });
-
   it("Vercel Blob: uses the scoped token via the Blob client", async () => {
     actions.createUploadAction.mockResolvedValue({
       assetId: "a",
@@ -142,5 +132,54 @@ describe("uploadFile", () => {
     await expect(uploadFile(new File(["x"], "a.zip", { type: "application/zip" }))).rejects.toThrow(
       /Unsupported/,
     );
+  });
+});
+
+describe("video probe (#24)", () => {
+  /** jsdom never loads media: fake a <video> that reports metadata as soon as it gets a src. */
+  function fakeVideo(meta: { videoWidth: number; videoHeight: number; duration: number } | "error") {
+    const create = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string, opts?: ElementCreationOptions) => {
+      const el = create(tag, opts);
+      if (tag !== "video") return el;
+      Object.defineProperty(el, "src", {
+        set() {
+          queueMicrotask(() => {
+            if (meta === "error") (el as HTMLVideoElement).onerror?.(new Event("error") as never);
+            else {
+              Object.assign(el, meta);
+              (el as HTMLVideoElement).onloadedmetadata?.(new Event("loadedmetadata"));
+            }
+          });
+        },
+        get: () => "",
+      });
+      for (const k of ["videoWidth", "videoHeight", "duration"]) Object.defineProperty(el, k, { writable: true, value: 0 });
+      return el;
+    });
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() }));
+  }
+
+  const clip = new File(["mp4"], "loop.mp4", { type: "video/mp4" });
+
+  it("reads a portrait loop's size and duration and sends them with completion", async () => {
+    fakeVideo({ videoWidth: 1080, videoHeight: 1920, duration: 4.2 });
+    actions.createUploadAction.mockResolvedValue({ assetId: "a", upload: { strategy: "put", url: "https://x" } });
+    await uploadFile(clip);
+    expect(actions.completeUploadAction).toHaveBeenCalledWith("a", { width: 1080, height: 1920, duration: 4.2 });
+  });
+
+  it("still completes the upload when the browser can't read the file", async () => {
+    fakeVideo("error");
+    actions.createUploadAction.mockResolvedValue({ assetId: "a", upload: { strategy: "put", url: "https://x" } });
+    await uploadFile(clip);
+    expect(actions.completeUploadAction).toHaveBeenCalledWith("a");
+  });
+
+  it("never probes images", async () => {
+    const spy = vi.spyOn(document, "createElement");
+    actions.createUploadAction.mockResolvedValue({ assetId: "a", upload: { strategy: "put", url: "https://x" } });
+    await uploadFile(file);
+    expect(spy).not.toHaveBeenCalledWith("video");
   });
 });

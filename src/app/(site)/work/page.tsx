@@ -1,10 +1,7 @@
-import { pageMetadata, PublishedPage } from "@/features/content/published-page";
+import { pageDefaults, pageMetadata, PublishedPage } from "@/features/content/published-page";
 
 export function generateMetadata() {
-  return pageMetadata("work", "/work", {
-    title: "Work",
-    description: "Selected films edited by Ashyan Zafar: commercials, fashion films, short films and documentaries.",
-  });
+  return pageMetadata("work", "/work", pageDefaults.work);
 }
 
 export default function WorkPage() {

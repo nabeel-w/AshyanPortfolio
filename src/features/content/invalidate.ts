@@ -14,5 +14,11 @@ export const invalidate = {
     if (slug) updateTag(tags.project(slug));
   },
   clients: () => updateTag(tags.clients),
+  /** Labels show on every grid, the label pages and project pages, so a label change refreshes them all. */
+  labels: (...slugs: string[]) => {
+    updateTag(tags.labels);
+    updateTag(tags.projects);
+    for (const slug of slugs) updateTag(tags.label(slug));
+  },
   assets: () => updateTag(tags.assets),
 };

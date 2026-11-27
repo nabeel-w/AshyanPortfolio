@@ -36,7 +36,8 @@
     │   ├── (site)/              # PUBLIC — static, cached, SEO
     │   │   ├── layout.tsx       # Header, footer, blade cursor, Person/WebSite JSON-LD
     │   │   ├── page.tsx         # Home = SectionRenderer(home)
-    │   │   ├── work/[slug]/     # Project page + opengraph-image.tsx      (next)
+    │   │   ├── work/[slug]/     # Project page (layout by film orientation)
+    │   │   ├── work/label/[slug]/ # Label landing pages (static)
     │   │   ├── about/           #                                          (next)
     │   │   └── contact/         #                                          (next)
     │   ├── (auth)/login/        # Sign-in
@@ -55,7 +56,6 @@
     │   │   ├── auth/[...all]/   # Better Auth handler
     │   │   ├── analytics/       # Beacon endpoint                          (next)
     │   │   ├── uploads/         # Signed direct-upload URLs                (next)
-    │   │   └── webhooks/mux/    # Asset ready → status + revalidate        (next)
     │   ├── sitemap.ts · robots.ts · llms.txt/route.ts
     ├── components/
     │   ├── ui/                  # shadcn (generated; edit sparingly)
@@ -126,3 +126,13 @@ Public route (static shell) ← "use cache" getPublishedPage(slug) { cacheTag(`p
 - Sign-up endpoint exists but a DB hook rejects any email not in `ADMIN_EMAILS`. The first admin signs up once (curl in `prisma/seed.ts`).
 - `src/proxy.ts` is an optimistic cookie check only. The real check is `requireAdmin()` in the admin layout and in **every** server action.
 - Later options: passkeys or 2FA plugin, rate limiting on sign-in.
+
+## Labels (#28)
+
+A managed list (`Label`), several per project (`ProjectLabel`, ordered; the first is the **primary** label used for the card tag, the breadcrumb and "More in …"). Admin → Labels reorders (that order is the chip order everywhere), renames (the slug only changes on request and the old one keeps redirecting), describes, hides, merges and deletes. The project form has a label combobox that can create labels inline.
+
+On the site every label is a real link to `/work/label/<slug>`. On `/work` the chip rail filters the server-rendered grid in place (`WorkFilter`): `?label=` on load, `pushState` on click, Back works, and the count and numbering update. Cards are stretched links, so label links sit above the card link without nesting anchors. The work-grid section's chips are `"auto"` (every visible label with work) or a chosen list; stored data from before v2 (`categories`) is upgraded on read (`upgradeSectionData`).
+
+## Bento grid and project layouts (#29, #30)
+
+`tileFor()` (`features/sections/bento.ts`) picks each card's tile: the admin's `cardSize` first, then the film's orientation (portrait → tall 1×2, square → 1×1), then the first featured landscape film → feature 2×2, else wide 2×1. Rows are sized from the column width with container query units so a tall tile is exactly 9:16 (CLS 0), and `grid-auto-flow: dense` back-fills holes when a filter hides cards. Project pages use the same orientation: portrait reels and square edits get the player beside the text over a blurred backdrop; landscape films keep the full-bleed hero.

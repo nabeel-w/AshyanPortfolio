@@ -7,11 +7,11 @@ import { absoluteUrl } from "@/lib/site-url";
 import { loadGoogleFont } from "./og-font";
 
 /**
- * Shared plumbing for Open Graph cards (site card + project cards):
+ * Shared plumbing for Open Graph cards (rendered by og-template.tsx):
  *  - inputs (background still, font subsets, monogram) are fetched once and cached ("use cache"),
  *    so a crawler gets the card in milliseconds instead of re-fetching everything per request;
  *  - output is a ~100 KB JPEG, not a ~700 KB PNG. WhatsApp ignores preview images over ~300 KB,
- *    and every chat app loads it faster.
+ *    and every chat app loads it faster. The admin preview uses the same encoder settings.
  */
 
 export const OG_SIZE = { width: 1200, height: 630 };
@@ -25,11 +25,16 @@ export const OG_COLORS = {
   signal: "#f23a45",
 } as const;
 
-/** Remote or site-relative image → cover-cropped 1200×630 JPEG data URL (Satori can't decode WebP/AVIF). */
+/**
+ * Remote or site-relative image → cover-cropped JPEG data URL (Satori can't decode WebP/AVIF).
+ * The focal point (0–1) stays in frame; the centre uses sharp's own cover crop. All args are the cache key.
+ */
 export async function ogBackground(
   src: string,
   width = OG_SIZE.width,
   height = OG_SIZE.height,
+  focalX = 0.5,
+  focalY = 0.5,
 ): Promise<string | null> {
   "use cache";
   cacheLife("max");
@@ -37,14 +42,32 @@ export async function ogBackground(
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const jpeg = await sharp(Buffer.from(await res.arrayBuffer()))
-      .resize(width, height, { fit: "cover" })
+    const jpeg = await (await coverCrop(Buffer.from(await res.arrayBuffer()), width, height, focalX, focalY))
       .jpeg({ quality: 82 })
       .toBuffer();
     return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
   } catch {
     return null;
   }
+}
+
+/** Cover-crop to width × height, keeping (fx, fy) in frame. sharp has no focal crop: resize, then extract. */
+export async function coverCrop(input: Buffer, width: number, height: number, fx = 0.5, fy = 0.5) {
+  if (fx === 0.5 && fy === 0.5) return sharp(input).resize(width, height, { fit: "cover" });
+  const meta = await sharp(input).metadata();
+  const w0 = meta.width ?? width;
+  const h0 = meta.height ?? height;
+  const scale = Math.max(width / w0, height / h0);
+  const rw = Math.max(width, Math.round(w0 * scale));
+  const rh = Math.max(height, Math.round(h0 * scale));
+  const clamp = (v: number, max: number) => Math.min(Math.max(0, Math.round(v)), max);
+  const resized = await sharp(input).resize(rw, rh).toBuffer();
+  return sharp(resized).extract({
+    left: clamp(fx * rw - width / 2, rw - width),
+    top: clamp(fy * rh - height / 2, rh - height),
+    width,
+    height,
+  });
 }
 
 /** Only the glyphs in `text`, base64 (cache-serializable). Null → Satori's fallback font. */
@@ -55,10 +78,19 @@ export async function ogFont(family: string, text: string): Promise<string | nul
   return data ? Buffer.from(data).toString("base64") : null;
 }
 
-type FontSpec = { name: string; data: string | null; style?: "normal" | "italic"; weight?: 400 };
+/**
+ * Admin preview: the same Google subset, fetched per render and never cached, so typing a headline
+ * doesn't leave a cache entry per keystroke (#33). (Satori can't read the committed woff2 files.)
+ */
+export async function ogFontUncached(family: string, text: string): Promise<string | null> {
+  const data = await loadGoogleFont(family, text);
+  return data ? Buffer.from(data).toString("base64") : null;
+}
 
-/** Render with Satori, then re-encode to an optimised JPEG. */
-export async function ogJpeg(element: ReactElement, fonts: FontSpec[]): Promise<Response> {
+export type FontSpec = { name: string; data: string | null; style?: "normal" | "italic"; weight?: 400 };
+
+/** Render with Satori, then re-encode to an optimised JPEG (same settings for cards and previews). */
+export async function ogJpegBytes(element: ReactElement, fonts: FontSpec[]): Promise<Buffer> {
   const png = await new ImageResponse(element, {
     ...OG_SIZE,
     fonts: fonts
@@ -73,7 +105,12 @@ export async function ogJpeg(element: ReactElement, fonts: FontSpec[]): Promise<
         };
       }),
   }).arrayBuffer();
-  const jpeg = await sharp(Buffer.from(png)).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+  return sharp(Buffer.from(png)).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+}
+
+/** A public, CDN-cacheable card response (URLs are versioned with ?v=, so a long cache is safe). */
+export async function ogJpeg(element: ReactElement, fonts: FontSpec[]): Promise<Response> {
+  const jpeg = await ogJpegBytes(element, fonts);
   return new Response(new Uint8Array(jpeg), {
     headers: {
       "Content-Type": OG_CONTENT_TYPE,
@@ -82,13 +119,4 @@ export async function ogJpeg(element: ReactElement, fonts: FontSpec[]): Promise<
   });
 }
 
-/** "Crafting visual stories *through edit.*" → [["Crafting visual stories ", false], ["through edit.", true]] */
-export function accentParts(text: string): [string, boolean][] {
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, "$1") // **SANS CAPS** has no special look on the card
-    .split(/(\*[^*]+\*)/g)
-    .filter(Boolean)
-    .map((part) =>
-      part.startsWith("*") && part.endsWith("*") ? [part.slice(1, -1), true] : [part, false],
-    );
-}
+export { accentParts } from "./share";

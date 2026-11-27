@@ -4,7 +4,7 @@ import { pageSections, site } from "@/content/fallback";
 import { Faq } from "@/components/site/faq";
 import type { SectionProps } from "@/features/sections/schemas";
 import robots from "@/app/robots";
-import { faqJsonLd, personJsonLd, profilePageJsonLd, profileUrls, projectJsonLd } from "./json-ld";
+import { faqJsonLd, labelPageJsonLd, personJsonLd, profilePageJsonLd, profileUrls, projectJsonLd } from "./json-ld";
 
 const faq = pageSections.about.find((s) => s.type === "faq")!.data as SectionProps<"faq">;
 
@@ -59,6 +59,17 @@ describe("FAQ (GEO)", () => {
   });
 });
 
+const youtubeFilm = {
+  youtubeId: "dQw4w9WgXcQ",
+  kind: "video" as const,
+  orientation: "landscape" as const,
+  aspect: 16 / 9,
+  duration: 20,
+  poster: { src: "/media/x.webp", alt: "" },
+  embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  watchUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+};
+
 describe("ProfilePage + VideoObject", () => {
   it("/about is a ProfilePage about the same #person entity", () => {
     const ld = profilePageJsonLd(site);
@@ -73,17 +84,69 @@ describe("ProfilePage + VideoObject", () => {
         format: "Brand Film",
         year: 2024,
         category: "Commercial",
+        labels: [],
+        related: [],
         summary: "S",
         story: [],
         credits: [],
         cover: { src: "/media/x.webp", alt: "" },
-        film: { playbackId: "pb", duration: 20, poster: "" },
+        film: youtubeFilm,
         transcript: "She looks up. Silence.",
         gallery: [],
       },
       site,
     );
     expect(ld["@graph"][0]).toMatchObject({ "@type": ["VideoObject", "CreativeWork"], transcript: "She looks up. Silence.", duration: "PT20S" });
+  });
+
+  it("points the VideoObject at the YouTube player, never at a file we don't host (#25)", () => {
+    const base = { slug: "x", title: "X", format: "Reel", year: 2024, category: "Fashion", labels: [], related: [], summary: "S", story: [], credits: [], cover: { src: "/media/x.webp", alt: "" }, gallery: [] };
+    const work = projectJsonLd({ ...base, film: youtubeFilm }, site)["@graph"][0] as Record<string, unknown>;
+    expect(work).toMatchObject({
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      sameAs: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      thumbnailUrl: ["http://localhost:3000/media/x.webp", "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"],
+      width: 1920,
+      height: 1080,
+    });
+    expect(work).not.toHaveProperty("contentUrl");
+    const reel = projectJsonLd({ ...base, film: { ...youtubeFilm, kind: "short", orientation: "portrait", aspect: 9 / 16 } }, site)["@graph"][0];
+    expect(reel).toMatchObject({ width: 1080, height: 1920 });
+    expect(projectJsonLd(base, site)["@graph"][0]).toMatchObject({ "@type": "CreativeWork" });
+  });
+});
+
+describe("labels in structured data (#28)", () => {
+  const base = { slug: "x", title: "X", format: "Fashion Film", year: 2024, category: "Fashion", related: [], summary: "S", story: [], credits: [], cover: { src: "/media/x.webp", alt: "" }, gallery: [] };
+
+  it("adds labels as keywords, the primary label as genre, and a label step in the breadcrumb", () => {
+    const ld = projectJsonLd({ ...base, labels: [{ name: "Fashion", slug: "fashion", visible: true }, { name: "Reels", slug: "reels", visible: true }] }, site);
+    expect(ld["@graph"][0]).toMatchObject({ keywords: "Fashion, Reels", genre: ["Fashion Film", "Fashion"] });
+    const crumbs = (ld["@graph"][1] as { itemListElement: { name: string; position: number; item: string }[] }).itemListElement;
+    expect(crumbs.map((c) => c.name)).toEqual(["Home", "Work", "Fashion", "X"]);
+    expect(crumbs[2]!.item).toBe("http://localhost:3000/work/label/fashion");
+    expect(crumbs[3]!.position).toBe(4);
+  });
+
+  it("skips hidden labels in the breadcrumb", () => {
+    const ld = projectJsonLd({ ...base, labels: [{ name: "Secret", slug: "secret", visible: false }] }, site);
+    const crumbs = (ld["@graph"][1] as { itemListElement: { name: string }[] }).itemListElement;
+    expect(crumbs.map((c) => c.name)).toEqual(["Home", "Work", "X"]);
+  });
+
+  it("describes a label page as a CollectionPage with an ItemList and breadcrumb", () => {
+    const ld = labelPageJsonLd({ name: "Fashion", slug: "fashion", description: "Fashion films." }, [
+      { slug: "a", title: "A" },
+      { slug: "b", title: "B" },
+    ]);
+    const [page, crumbs] = ld["@graph"] as unknown as [Record<string, unknown>, { itemListElement: { name: string }[] }];
+    expect(page).toMatchObject({
+      "@type": "CollectionPage",
+      url: "http://localhost:3000/work/label/fashion",
+      description: "Fashion films.",
+      mainEntity: { "@type": "ItemList", numberOfItems: 2, itemListElement: [{ position: 1, url: "http://localhost:3000/work/a" }, { position: 2 }] },
+    });
+    expect(crumbs.itemListElement.map((c) => c.name)).toEqual(["Home", "Work", "Fashion"]);
   });
 });
 

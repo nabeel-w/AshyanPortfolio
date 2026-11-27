@@ -7,10 +7,12 @@ const db = vi.hoisted(() => ({
   page: { findFirst: vi.fn() },
   project: { findMany: vi.fn() },
   client: { findMany: vi.fn() },
+  label: { count: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ db }));
 
-const { getPublishedPage, getPublishedProjects, getSite, getWorkList } = await import("./queries");
+const { chipLabels, getLabel, getLabels, getPublishedPage, getPublishedProjects, getSite, getWorkList } =
+  await import("./queries");
 
 const hero = homeSections.find((s) => s.type === "hero")!;
 const grid = homeSections.find((s) => s.type === "workGrid")!;
@@ -29,6 +31,8 @@ const row = (s: (typeof homeSections)[number], overrides: object = {}) => ({
 beforeEach(() => {
   db.project.findMany.mockResolvedValue([]);
   db.client.findMany.mockResolvedValue([]);
+  db.label.count.mockResolvedValue(0);
+  db.label.findMany.mockResolvedValue([]);
 });
 
 describe("getSite", () => {
@@ -99,7 +103,7 @@ describe("getPublishedPage", () => {
       where: { slug: "home", status: "PUBLISHED" },
       include: { sections: { where: { publishedVisible: true }, orderBy: { publishedOrder: "asc" } } },
     });
-    expect(cacheTag).toHaveBeenCalledWith("page:home", "projects", "clients");
+    expect(cacheTag).toHaveBeenCalledWith("page:home", "projects", "clients", "labels");
   });
 
   it("returns publishedData — never the draft", async () => {
@@ -145,7 +149,10 @@ describe("getPublishedPage", () => {
         format: "Commercial",
         year: 2026,
         createdAt: new Date("2026-01-01"),
-        category: { name: "Commercial" },
+        labels: [
+          { order: 0, label: { name: "Commercial", slug: "commercial", visible: true } },
+          { order: 1, label: { name: "Secret", slug: "secret", visible: false } },
+        ],
         cover: {
           url: "https://cdn/real.webp",
           alt: "Real",
@@ -153,7 +160,7 @@ describe("getPublishedPage", () => {
           height: 900,
           blurDataUrl: "data:x",
         },
-        loop: { playbackId: "pb_loop", status: "READY" },
+        loop: { status: "READY", kind: "VIDEO", url: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 720, height: 1280 },
       },
     ]);
     const [section] = await getPublishedPage("home");
@@ -164,7 +171,10 @@ describe("getPublishedPage", () => {
         title: "Real Film",
         format: "Commercial",
         year: 2026,
-        category: "Commercial",
+        labels: [{ name: "Commercial", slug: "commercial" }],
+        orientation: "landscape",
+        cardSize: "auto",
+        featured: undefined,
         cover: {
           src: "https://cdn/real.webp",
           alt: "Real",
@@ -172,7 +182,7 @@ describe("getPublishedPage", () => {
           height: 900,
           blurDataUrl: "data:x",
         },
-        loopPlaybackId: "pb_loop",
+        loop: { src: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 720, height: 1280 },
       },
     ]);
   });
@@ -184,11 +194,22 @@ describe("getPublishedPage", () => {
         title: "P",
         createdAt: new Date("2026-01-01"),
         cover: { url: "https://cdn/p.webp", alt: "" },
-        loop: { playbackId: "pb", status: "PROCESSING" },
+        loop: { url: "https://x.public.blob.vercel-storage.com/l.mp4", status: "PROCESSING" },
       },
     ]);
     const [item] = await getPublishedProjects();
-    expect(item!.loopPlaybackId).toBeUndefined();
+    expect(item!.loop).toBeUndefined();
+  });
+
+  it("uses a Blob video picked as a loop (no playback id needed), but never an image", async () => {
+    const base = { slug: "p", title: "P", createdAt: new Date("2026-01-01"), cover: { url: "https://cdn/p.webp", alt: "" } };
+    db.project.findMany.mockResolvedValue([
+      { ...base, loop: { url: "https://x.public.blob.vercel-storage.com/l.mp4", status: "READY", kind: "VIDEO", width: null, height: null } },
+      { ...base, slug: "q", loop: { url: "https://cdn/still.webp", status: "READY", kind: "IMAGE" } },
+    ]);
+    const [blob, image] = await getPublishedProjects();
+    expect(blob!.loop).toEqual({ src: "https://x.public.blob.vercel-storage.com/l.mp4" });
+    expect(image!.loop).toBeUndefined();
   });
 
   it("hydrates the marquee from client rows", async () => {
@@ -232,5 +253,87 @@ describe("getPublishedProjects / getWorkList", () => {
     expect(list.map((p) => p.slug)).toEqual(
       (grid.data as { projects: { slug: string }[] }).projects.map((p) => p.slug),
     );
+  });
+});
+
+describe("labels (#28)", () => {
+  const project = (slug: string, labels: [string, boolean][]) => ({
+    slug,
+    title: slug.toUpperCase(),
+    format: "Film",
+    year: 2025,
+    createdAt: new Date("2025-01-01"),
+    cover: { url: `https://cdn/${slug}.webp`, alt: "" },
+    labels: labels.map(([s, visible], order) => ({ order, label: { name: s[0]!.toUpperCase() + s.slice(1), slug: s, visible } })),
+  });
+
+  it("getLabels lists visible labels in admin order with published-film counts", async () => {
+    db.label.count.mockResolvedValue(3);
+    db.label.findMany.mockResolvedValue([
+      { name: "Reels", slug: "reels", _count: { projects: 2 } },
+      { name: "Fashion", slug: "fashion", _count: { projects: 0 } },
+    ]);
+    expect(await getLabels()).toEqual([
+      { name: "Reels", slug: "reels", count: 2 },
+      { name: "Fashion", slug: "fashion", count: 0 },
+    ]);
+    expect(db.label.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { visible: true } }));
+    expect(cacheTag).toHaveBeenCalledWith("labels", "projects");
+  });
+
+  it("getLabels derives labels from the work list on a fresh database", async () => {
+    db.label.count.mockResolvedValue(0);
+    db.page.findFirst.mockResolvedValue(null);
+    const labels = await getLabels();
+    expect(labels.map((l) => l.slug)).toEqual(["commercial", "reels", "fashion", "music-video", "film", "documentary"]);
+    expect(labels[0]!.count).toBe(2);
+  });
+
+  it("chipLabels: auto = labels with work; a list keeps its order and drops empty or unknown ones", () => {
+    const all = [
+      { name: "A", slug: "a", count: 1 },
+      { name: "B", slug: "b", count: 0 },
+      { name: "C", slug: "c", count: 3 },
+    ];
+    expect(chipLabels("auto", all).map((l) => l.slug)).toEqual(["a", "c"]);
+    expect(chipLabels(["c", "b", "zzz", "a"], all).map((l) => l.slug)).toEqual(["c", "a"]);
+  });
+
+  it("getLabel returns the label and its published films; card tags skip hidden labels", async () => {
+    db.label.count.mockResolvedValue(2);
+    db.label.findUnique.mockResolvedValue({ id: "l1", name: "Fashion", slug: "fashion", visible: true, description: " Dresses. ", seoTitle: null, seoDescription: null });
+    db.project.findMany.mockResolvedValue([project("a", [["fashion", true], ["secret", false]])]);
+    const hit = await getLabel("fashion");
+    expect(hit).toMatchObject({ label: { name: "Fashion", slug: "fashion", description: "Dresses." } });
+    const label = (hit as { label: { projects: { labels: unknown[] }[] } }).label;
+    expect(label.projects[0]!.labels).toEqual([{ name: "Fashion", slug: "fashion" }]);
+    expect(db.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: "PUBLISHED", labels: { some: { labelId: "l1" } } }) }),
+    );
+  });
+
+  it("getLabel redirects a renamed label's old slug and hides hidden labels", async () => {
+    db.label.count.mockResolvedValue(2);
+    db.label.findUnique.mockResolvedValue(null);
+    db.label.findFirst.mockResolvedValue({ slug: "fashion-films", visible: true });
+    expect(await getLabel("fashion")).toEqual({ redirect: "fashion-films" });
+    expect(db.label.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { previousSlugs: { has: "fashion" } } }));
+
+    db.label.findFirst.mockResolvedValue(null);
+    expect(await getLabel("gone")).toBeNull();
+
+    db.label.findUnique.mockResolvedValue({ id: "l2", name: "Secret", slug: "secret", visible: false });
+    expect(await getLabel("secret")).toBeNull();
+  });
+
+  it("hydrates the grid's chip rail from the Label table, and filters in place only on /work", async () => {
+    db.page.findFirst.mockResolvedValue({ sections: [row(grid)] });
+    db.project.findMany.mockResolvedValue([project("a", [["reels", true]])]);
+    db.label.count.mockResolvedValue(1);
+    db.label.findMany.mockResolvedValue([{ name: "Reels", slug: "reels", _count: { projects: 1 } }]);
+    const [home] = await getPublishedPage("home");
+    expect(home!.data).toMatchObject({ labelList: [{ name: "Reels", slug: "reels", count: 1 }], chips: "links" });
+    const [work] = await getPublishedPage("work");
+    expect(work!.data).toMatchObject({ chips: "filter" });
   });
 });

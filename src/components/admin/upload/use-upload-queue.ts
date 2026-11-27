@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  completeUploadAction,
   importFromDriveAction,
   importProgressAction,
   retryImportAction,
@@ -11,7 +10,7 @@ import { uploadFile } from "@/features/media/client/upload";
 import type { PickedFile } from "@/features/google/client";
 
 export type QueueSource = "device" | "drive";
-export type QueueStatus = "uploading" | "processing" | "done" | "error";
+export type QueueStatus = "uploading" | "done" | "error";
 
 export type QueueItem = {
   key: string;
@@ -33,13 +32,13 @@ const message = (e: unknown) => (e instanceof Error ? e.message : "Upload failed
 
 /**
  * Everything being added to the library, whatever the source. Device files upload from the browser
- * straight to the provider; Drive files transfer server-side and are polled for progress; both then
- * wait for the provider to finish processing (e.g. Mux transcoding). Lives in the page, not the
+ * straight to the provider; Drive files transfer server-side and are polled for progress until the
+ * provider reports the file READY. Lives in the page, not the
  * dialog, so closing the dialog doesn't stop anything.
  *
  * `onChange` fires when an item changes state (created, done, failed), so callers can refresh lists.
  */
-export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
+export function useUploadQueue({ onChange, purpose }: { onChange?: () => void; purpose?: "loop" } = {}) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const files = useRef(new Map<string, File>());
   const changed = useRef(onChange);
@@ -57,23 +56,20 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
       try {
         const asset = await uploadFile(file, {
           onProgress: (progress) => patch(key, { progress }),
+          ...(purpose ? { purpose } : {}),
         });
         patch(key, {
           assetId: asset.id,
           progress: 1,
-          status:
-            asset.status === "READY" ? "done" : asset.status === "ERRORED" ? "error" : "processing",
-          error:
-            asset.status === "ERRORED"
-              ? "The storage provider couldn't process this file."
-              : undefined,
+          status: asset.status === "READY" ? "done" : "error",
+          error: asset.status === "READY" ? undefined : "The storage provider couldn't store this file.",
         });
       } catch (e) {
         patch(key, { status: "error", error: message(e) });
       }
       changed.current?.();
     },
-    [patch],
+    [patch, purpose],
   );
 
   const addFiles = useCallback(
@@ -105,7 +101,9 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
         })),
       ]);
       try {
-        const results = await importFromDriveAction(rows.map((r) => r.id));
+        const results = purpose
+          ? await importFromDriveAction(rows.map((r) => r.id), purpose)
+          : await importFromDriveAction(rows.map((r) => r.id));
         for (const r of rows) {
           const res = results.find((x) => x.fileId === r.id);
           patch(
@@ -120,7 +118,7 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
       }
       changed.current?.();
     },
-    [patch],
+    [patch, purpose],
   );
 
   const retry = useCallback(
@@ -147,12 +145,8 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
     setItems((list) => list.filter((i) => i.key !== key));
   }, []);
 
-  // Poll what's still moving: Drive transfers (progress) and provider processing (until READY).
-  const watching = items.filter(
-    (i) =>
-      i.assetId &&
-      (i.status === "processing" || (i.source === "drive" && i.status === "uploading")),
-  );
+  // Poll Drive transfers for progress. The import finalizes the asset itself (READY when DONE).
+  const watching = items.filter((i) => i.assetId && i.source === "drive" && i.status === "uploading");
   const watchKey = watching.map((i) => `${i.key}:${i.status}`).join(",");
   useEffect(() => {
     if (!watching.length) return;
@@ -162,7 +156,7 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
       busy = true;
       try {
         let transitioned = false;
-        const importing = watching.filter((i) => i.status === "uploading");
+        const importing = watching;
         if (importing.length) {
           const progress = await importProgressAction(importing.map((i) => i.assetId!)).catch(
             () => [],
@@ -174,7 +168,7 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
               patch(item.key, { status: "error", error: p.error ?? "Import failed" });
               transitioned = true;
             } else if (p.status === "DONE") {
-              patch(item.key, { progress: 1, status: "processing" });
+              patch(item.key, { progress: 1, status: "done" });
               transitioned = true;
             } else {
               patch(item.key, {
@@ -182,19 +176,6 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
                 error: p.error ?? undefined,
               });
             }
-          }
-        }
-        for (const item of watching.filter((i) => i.status === "processing")) {
-          const asset = await completeUploadAction(item.assetId!).catch(() => null);
-          if (asset?.status === "READY") {
-            patch(item.key, { status: "done" });
-            transitioned = true;
-          } else if (asset?.status === "ERRORED") {
-            patch(item.key, {
-              status: "error",
-              error: "The storage provider couldn't process this file.",
-            });
-            transitioned = true;
           }
         }
         if (transitioned) changed.current?.();
@@ -206,6 +187,6 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-subscribe only when the watched set changes
   }, [watchKey]);
 
-  const active = items.filter((i) => i.status === "uploading" || i.status === "processing").length;
+  const active = items.filter((i) => i.status === "uploading").length;
   return { items, active, addFiles, addDrive, retry, dismiss };
 }

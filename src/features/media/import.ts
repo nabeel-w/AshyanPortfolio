@@ -4,6 +4,8 @@ import type { AssetImport, Prisma } from "@/generated/prisma/client";
 import { tags } from "@/features/content/tags";
 import { driveFileMeta, driveReadRange } from "@/features/google/drive";
 import { db } from "@/lib/db";
+import { cleanProbe } from "./probe";
+import type { UploadPurpose } from "./util";
 import { completeUpload, validateUpload } from "./service";
 import { getProvider, providerFor } from "./providers";
 import {
@@ -23,7 +25,7 @@ import { hmac, makeKey, safeEqualHex } from "./util";
  *       read 16 MiB from the source (HTTP Range) → importer.part() → save bytesDone + state
  *   out of time → the route kicks itself again; a failed chunk retries in place, then the whole run
  *   retries later from the last saved chunk; after MAX_ATTEMPTS the import (and asset) fail.
- *   last chunk → importer.complete() → completeUpload() (same finalize/webhook pipeline as browser uploads)
+ *   last chunk → importer.complete() → completeUpload() (same finalize pipeline as browser uploads)
  *
  * A short lease (leaseUntil) makes sure only one runner moves a file at a time. If a function dies,
  * the lease expires and the admin's progress polling (importProgress) kicks the import again.
@@ -42,9 +44,9 @@ export type ImportSource = "google-drive";
 // ─── Creating ────────────────────────────────────────────────────────────────
 
 /** Validate a picked Drive file and start importing it. Returns the new asset id. */
-export async function createDriveImport(accountId: string, fileId: string): Promise<string> {
+export async function createDriveImport(accountId: string, fileId: string, purpose?: UploadPurpose): Promise<string> {
   const file = await driveFileMeta(accountId, fileId);
-  const kind = validateUpload(file.mimeType, file.size);
+  const kind = validateUpload(file.mimeType, file.size, purpose);
   const provider = providerFor(kind);
   if (!provider.importer) {
     throw new Error(
@@ -59,6 +61,15 @@ export async function createDriveImport(accountId: string, fileId: string): Prom
     bytes: file.size,
     kind,
   });
+  // Drive reports a video's size and runtime, which a server import can't probe in a browser (#24).
+  const shape =
+    kind === "VIDEO" && file.video
+      ? cleanProbe({
+          width: file.video.width,
+          height: file.video.height,
+          duration: file.video.durationMillis === undefined ? undefined : file.video.durationMillis / 1000,
+        })
+      : {};
   const asset = await db.asset.create({
     data: {
       kind,
@@ -68,6 +79,7 @@ export async function createDriveImport(accountId: string, fileId: string): Prom
       filename: file.name,
       mimeType: file.mimeType,
       bytes: BigInt(file.size),
+      ...shape,
       meta: { import: { source: "google-drive", fileId: file.id, md5: file.md5Checksum ?? null } },
       import: {
         create: {

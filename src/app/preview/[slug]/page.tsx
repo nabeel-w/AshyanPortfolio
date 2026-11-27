@@ -37,7 +37,7 @@ async function Preview({ params, searchParams }: PageProps<"/preview/[slug]">) {
   if (!page) notFound();
 
   const [sections, site] = await Promise.all([
-    hydrateSections(parseSections(page.sections.map((s) => ({ id: s.id, type: s.type, data: s.data })), `preview:/${slug}`)),
+    hydrateSections(parseSections(page.sections.map((s) => ({ id: s.id, type: s.type, data: s.data })), `preview:/${slug}`), slug),
     getSite(),
   ]);
   return <PreviewBridge initial={sections} site={site} />;

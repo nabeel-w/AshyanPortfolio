@@ -12,9 +12,8 @@ export default async function AdminProjectsList() {
     orderBy: [{ status: "asc" }, { featured: "desc" }, { order: "asc" }, { updatedAt: "desc" }],
     include: {
       cover: true,
-      category: true,
+      labels: { include: { label: true }, orderBy: { order: "asc" } },
       loop: { select: { id: true } },
-      film: { select: { id: true } },
     },
   });
   return (
@@ -51,7 +50,7 @@ export default async function AdminProjectsList() {
                 <div className="space-y-2 p-4">
                   <p className="font-serif text-2xl text-ivory group-hover:text-red">{p.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {[p.format, p.year, p.category?.name].filter(Boolean).join(" · ")}
+                    {[p.format, p.year, ...p.labels.map((pl) => pl.label.name)].filter(Boolean).join(" · ")}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant={p.status === "PUBLISHED" ? "secondary" : "outline"}>
@@ -59,7 +58,13 @@ export default async function AdminProjectsList() {
                     </Badge>
                     {p.featured ? <Badge variant="outline">featured</Badge> : null}
                     {p.loop ? <Badge variant="outline">hover loop</Badge> : null}
-                    {p.film ? <Badge variant="outline">film</Badge> : null}
+                    {p.filmYoutubeId ? (
+                      <Badge variant="outline">
+                        YouTube · {p.filmOrientation === "PORTRAIT" ? "Short" : p.filmOrientation === "SQUARE" ? "Square" : "Long"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">no film</Badge>
+                    )}
                   </div>
                 </div>
               </Link>

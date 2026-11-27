@@ -9,14 +9,17 @@ import type { FieldDef } from "@/features/admin/fields";
 import type { AssetSummary } from "@/features/media/summary";
 import { deleteProject, saveProject, type ProjectInput } from "@/features/projects/actions";
 import { AssetField, GalleryField } from "./asset-field";
+import { absoluteUrl } from "@/lib/site-url";
 import { ConfirmButton } from "./confirm-button";
+import { ShareOverrideEditor } from "./share/share-fields";
+import { LabelPicker, type PickedLabel } from "./label-picker";
+import { YouTubeFilmField, type YouTubeFilmValue } from "./youtube-film-field";
 import { SchemaForm } from "./schema-form";
 
 const contentFields: FieldDef[] = [
   { type: "text", name: "title", label: "Title" },
   { type: "text", name: "slug", label: "URL slug", help: "Leave empty to generate from the title. Changing it changes the page URL." },
   { type: "text", name: "format", label: "Format", placeholder: "Brand Film" },
-  { type: "text", name: "category", label: "Category (filter chip)", placeholder: "Commercial", help: "Should match one of the work grid's filter chips." },
   { type: "text", name: "clientName", label: "Client" },
   { type: "number", name: "year", label: "Year", min: 1990, max: 2100 },
   { type: "text", name: "role", label: "Your role", placeholder: "Edit · Colour · Sound design" },
@@ -48,14 +51,27 @@ const seoFields: FieldDef[] = [
   { type: "textarea", name: "seoDescription", label: "Meta description", rows: 2, help: "Optional. Defaults to the summary." },
 ];
 
-export type ProjectFormValue = Omit<ProjectInput, "coverId" | "filmId" | "loopId" | "galleryIds"> & {
+export type ProjectFormValue = Omit<
+  ProjectInput,
+  "coverId" | "loopId" | "galleryIds" | "labelIds" | "filmUrl" | "filmOrientation" | "filmAspect" | "filmRuntime"
+> &
+  YouTubeFilmValue & {
   cover: AssetSummary | null;
-  film: AssetSummary | null;
   loop: AssetSummary | null;
+  labels: PickedLabel[];
   gallery: AssetSummary[];
 };
 
-export function ProjectForm({ id, initial }: { id: string | null; initial: ProjectFormValue }) {
+export function ProjectForm({
+  id,
+  initial,
+  labelOptions,
+}: {
+  id: string | null;
+  initial: ProjectFormValue;
+  labelOptions: PickedLabel[];
+}) {
+  const [options, setOptions] = useState(labelOptions);
   const router = useRouter();
   const [value, setValue] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -64,14 +80,14 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
 
   function save(status?: ProjectFormValue["status"]) {
     startTransition(async () => {
-      const { cover, film, loop, gallery, ...rest } = value;
+      const { cover, loop, gallery, labels, ...rest } = value;
       const res = await saveProject(id, {
         ...rest,
         status: status ?? rest.status,
         coverId: cover?.id ?? null,
-        filmId: film?.id ?? null,
         loopId: loop?.id ?? null,
         galleryIds: gallery.map((g) => g.id),
+        labelIds: labels.map((l) => l.id),
       });
       if (!res.ok) {
         setErrors(res.errors);
@@ -149,8 +165,25 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
             onChange={(v) => setValue(v as unknown as ProjectFormValue)}
             errors={errors}
           />
+          <div className="mt-6">
+            <LabelPicker
+              value={value.labels}
+              options={options}
+              onChange={(labels) => set({ labels })}
+              onCreated={(l) => setOptions((o) => [...o, l])}
+              error={errors.labelIds}
+            />
+          </div>
         </section>
-        <aside className="space-y-6">
+        <section aria-label="Film" className="rounded-md border border-border bg-onyx p-5 xl:col-start-1">
+          <YouTubeFilmField
+            value={value}
+            onChange={set}
+            onUseTitle={(title) => set({ title })}
+            errors={errors}
+          />
+        </section>
+        <aside className="space-y-6 xl:col-start-2 xl:row-span-2 xl:row-start-1">
           <section className="space-y-6 rounded-md border border-border bg-onyx p-5">
             <AssetField
               label="Cover (hi-res still)"
@@ -163,17 +196,30 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
             <AssetField
               label="Hover preview (short loop)"
               kind="VIDEO"
+              purpose="loop"
               asset={value.loop}
               onChange={(loop) => set({ loop })}
-              help="3–6 seconds, muted. Plays over the cover on hover (desktop) or when in view (phones)."
+              help="Loop: 3–6 s, muted, H.264 MP4 (or WebM), ≤ 720p (≤ 1280 px long edge), ~2–4 MB. Shoot reels’ loops in 9:16. Plays over the cover on hover (desktop) or while in view (phones)."
             />
-            <AssetField label="Full film" kind="VIDEO" asset={value.film} onChange={(film) => set({ film })} help="Plays on the project page." />
             <GalleryField assets={value.gallery} onChange={(gallery) => set({ gallery })} />
           </section>
           <section className="space-y-5 rounded-md border border-border bg-onyx p-5">
             <SchemaForm
               fields={[
                 { type: "switch", name: "featured", label: "Featured (shown first)" },
+                {
+                  type: "select",
+                  name: "cardSize",
+                  label: "Grid tile",
+                  options: [
+                    { value: "AUTO", label: "Automatic (from the film’s shape)" },
+                    { value: "FEATURE", label: "Feature · 2 × 2" },
+                    { value: "WIDE", label: "Wide · 2 × 1" },
+                    { value: "TALL", label: "Tall · 1 × 2 (reels)" },
+                    { value: "SQUARE", label: "Square · 1 × 1" },
+                  ],
+                  help: "Automatic: portrait films get a tall tile, square films a square one, and the first featured landscape film the big feature tile.",
+                },
                 { type: "number", name: "order", label: "Order", min: 0, help: "Lower numbers come first." },
                 ...seoFields,
               ]}
@@ -181,6 +227,30 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
               onChange={(v) => setValue(v as unknown as ProjectFormValue)}
               errors={errors}
             />
+          </section>
+          <section className="space-y-3 rounded-md border border-border bg-onyx p-5">
+            {id && live ? (
+              <ShareOverrideEditor
+                value={value.share ?? {}}
+                onChange={(share) => set({ share })}
+                target={{ kind: "project", slug: initial.slug ?? "" }}
+                context={{
+                  title: value.seoTitle || `${value.title} — ${value.format || "Film"}`,
+                  description: value.seoDescription || value.summary || "",
+                  url: absoluteUrl(`/work/${initial.slug}`),
+                }}
+                defaults={{
+                  headline: value.title || "The project title",
+                  background: "Using the cover",
+                  template: value.filmOrientation === "LANDSCAPE" ? "still + title" : "portrait split",
+                }}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Share card: publish the project to preview and customise its card. By default it uses the cover and title
+                (reels get the portrait split).
+              </p>
+            )}
           </section>
         </aside>
       </div>

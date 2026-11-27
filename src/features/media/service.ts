@@ -4,17 +4,25 @@ import { db } from "@/lib/db";
 import { getProvider, providerFor } from "./providers";
 import type { MediaKind, ProviderResult, StorageProvider, UploadInstruction } from "./types";
 import { analyzeImage } from "./image-meta";
-import { expectOk, kindFromMime, makeKey, maxBytes } from "./util";
+import type { MediaProbe } from "./probe";
+import {
+  expectOk,
+  kindFromMime,
+  LOOP_MIME_TYPES,
+  makeKey,
+  maxBytes,
+  maxLoopBytes,
+  type UploadPurpose,
+} from "./util";
 
 /**
- * The upload pipeline, provider-agnostic. Auth is NOT checked here — callers are
- * admin Server Actions (actions.ts) or signature-verified webhooks.
+ * The upload pipeline, provider-agnostic. Auth is NOT checked here — callers are admin Server
+ * Actions (actions.ts), the signed import route and scripts.
  *
- *   createUpload → browser uploads directly to the provider → completeUpload
- *   (streaming video may stay PROCESSING until the provider's webhook calls applyWebhook)
+ *   createUpload → browser uploads directly to the provider → completeUpload (READY)
  */
 
-export type UploadRequest = { filename: string; mimeType: string; bytes: number };
+export type UploadRequest = { filename: string; mimeType: string; bytes: number; purpose?: UploadPurpose };
 export type UploadTicket = {
   assetId: string;
   kind: MediaKind;
@@ -23,9 +31,18 @@ export type UploadTicket = {
 };
 
 /** Same type + size rules for every way a file gets in (browser upload, Drive import). */
-export function validateUpload(mimeType: string, bytes: number): MediaKind {
+export function validateUpload(mimeType: string, bytes: number, purpose?: UploadPurpose): MediaKind {
   const kind = kindFromMime(mimeType);
   if (!kind) throw new Error(`Unsupported file type: ${mimeType || "unknown"}`);
+  if (purpose === "loop") {
+    if (!(LOOP_MIME_TYPES as readonly string[]).includes(mimeType)) {
+      throw new Error("A hover loop must be an MP4 (H.264) or WebM file.");
+    }
+    if (bytes <= 0 || bytes > maxLoopBytes()) {
+      throw new Error(`Hover loops must be under ${Math.round(maxLoopBytes() / 1024 / 1024)} MB (aim for 2–4 MB).`);
+    }
+    return kind;
+  }
   if (bytes <= 0 || bytes > maxBytes(kind)) {
     throw new Error(
       `${kind.toLowerCase()} files must be under ${Math.round(maxBytes(kind) / 1024 / 1024)} MB`,
@@ -38,8 +55,9 @@ export async function createUpload({
   filename,
   mimeType,
   bytes,
+  purpose,
 }: UploadRequest): Promise<UploadTicket> {
-  const kind = validateUpload(mimeType, bytes);
+  const kind = validateUpload(mimeType, bytes, purpose);
   const provider = providerFor(kind);
   const key = makeKey(kind, filename);
   const { providerKey, upload } = await provider.createUpload({
@@ -82,7 +100,6 @@ function toUpdate(result: ProviderResult): Prisma.AssetUpdateInput {
   return {
     status: result.status,
     url: result.url,
-    playbackId: result.playbackId,
     duration: result.duration,
     width: result.width,
     height: result.height,
@@ -91,41 +108,43 @@ function toUpdate(result: ProviderResult): Prisma.AssetUpdateInput {
   };
 }
 
-/** Ask the provider what happened to the upload and persist it. Safe to call repeatedly (polling). */
-export async function completeUpload(assetId: string) {
+/**
+ * Ask the provider what happened to the upload and persist it. Safe to call repeatedly (polling).
+ * `probe` fills width/height/duration the provider didn't report (Blob stores none for videos).
+ */
+export async function completeUpload(assetId: string, probe: MediaProbe = {}) {
   const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
   const provider = getProvider(asset.provider);
   const result = await provider.finalize(asset.providerKey, asset.kind);
   const image =
     asset.kind === "IMAGE" ? await enrichImage(provider, asset.providerKey, result) : {};
-  return db.asset.update({ where: { id: assetId }, data: { ...toUpdate(result), ...image } });
-}
-
-/** Verify + apply a provider webhook. Returns the updated asset, or null if the event was ignored. */
-export async function applyWebhook(providerId: string, request: Request) {
-  const provider = getProvider(providerId);
-  if (!provider.webhook) throw new Error(`Provider "${providerId}" has no webhook handler`);
-  const update = await provider.webhook(request);
-  if (!update) return null;
-  const asset = await db.asset.findUnique({
-    where: { provider_providerKey: { provider: provider.id, providerKey: update.providerKey } },
+  const shape =
+    asset.kind === "VIDEO"
+      ? {
+          width: result.width ?? probe.width ?? undefined,
+          height: result.height ?? probe.height ?? undefined,
+          duration: result.duration ?? probe.duration ?? undefined,
+        }
+      : {};
+  return db.asset.update({
+    where: { id: assetId },
+    data: { ...toUpdate(result), ...shape, ...image },
   });
-  if (!asset) return null; // upload created outside this app
-  return db.asset.update({ where: { id: asset.id }, data: toUpdate(update.result) });
 }
 
 /**
  * Server-side upload of an in-memory file through the same provider pipeline the browser uses
- * (seeding, imports). Streaming video may come back PROCESSING — poll `completeUpload` or rely on the webhook.
+ * (seeding, one-off migrations).
  */
 export async function ingest(
   file: Buffer,
-  meta: { filename: string; mimeType: string; alt?: string },
+  meta: { filename: string; mimeType: string; alt?: string; purpose?: UploadPurpose; probe?: MediaProbe },
 ) {
   const ticket = await createUpload({
     filename: meta.filename,
     mimeType: meta.mimeType,
     bytes: file.length,
+    purpose: meta.purpose,
   });
   const body = new Uint8Array(file);
   const { upload } = ticket;
@@ -141,10 +160,6 @@ export async function ingest(
       }),
       "ingest PUT",
     );
-  } else if (upload.strategy === "form-post") {
-    const form = new FormData();
-    form.append(upload.fieldName, new Blob([body], { type: meta.mimeType }), meta.filename);
-    await expectOk(await fetch(upload.url, { method: "POST", body: form }), "ingest POST");
   } else {
     const { put } = await import("@vercel/blob/client");
     await put(upload.pathname, new Blob([body], { type: meta.mimeType }), {
@@ -154,7 +169,7 @@ export async function ingest(
     });
   }
   if (meta.alt) await db.asset.update({ where: { id: ticket.assetId }, data: { alt: meta.alt } });
-  return completeUpload(ticket.assetId);
+  return completeUpload(ticket.assetId, meta.probe);
 }
 
 /** Remove from the provider first, then the DB row (relations are SetNull / Cascade in the schema). */

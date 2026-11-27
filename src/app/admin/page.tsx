@@ -14,7 +14,7 @@ export default async function AdminOverview() {
     db.project.count(),
     db.project.count({ where: { status: "PUBLISHED" } }),
     db.asset.count({ where: { status: "READY" } }),
-    db.asset.count({ where: { status: "PROCESSING" } }),
+    db.asset.count({ where: { status: "UPLOADING", import: { isNot: null } } }),
     db.contactSubmission.count({ where: { read: false } }),
     db.client.count({ where: { visible: true } }),
     db.section.findMany({
@@ -44,7 +44,7 @@ export default async function AdminOverview() {
     },
     {
       label: "Media files",
-      value: processing ? `${assets} (+${processing})` : assets,
+      value: processing ? `${assets} (+${processing} importing)` : assets,
       href: "/admin/media",
       hot: false,
     },

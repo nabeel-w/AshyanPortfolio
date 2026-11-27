@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { SectionEditor } from "@/components/admin/section-editor";
 import { getSectionForEditor } from "@/features/pages/admin";
 import { sectionRegistry } from "@/features/sections/registry";
-import type { SectionType } from "@/features/sections/schemas";
+import { upgradeSectionData, type SectionType } from "@/features/sections/schemas";
 import { requireAdmin } from "@/lib/session";
 
 export default async function AdminSectionEditor({
@@ -17,7 +17,7 @@ export default async function AdminSectionEditor({
   const type = section.type as SectionType;
   return (
     <SectionEditor
-      section={{ id: section.id, type, data: (section.data ?? {}) as Record<string, unknown> }}
+      section={{ id: section.id, type, data: (upgradeSectionData(type, section.data) ?? {}) as Record<string, unknown> }}
       page={{ slug, title: section.page.title }}
       label={sectionRegistry[type].label}
     />

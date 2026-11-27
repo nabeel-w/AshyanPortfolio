@@ -1,6 +1,6 @@
 /**
  * Provider-agnostic storage contract. Everything outside `providers/` talks to this interface only,
- * so swapping Mux ↔ Cloudflare Stream or Blob ↔ R2 is an env change, not a code change.
+ * so adding a store is one adapter file, not a code change elsewhere. Today: Vercel Blob + local (dev).
  * Adding a provider = one file implementing `StorageProvider` + one line in `providers/index.ts`.
  * Guide: docs/03-asset-storage.md#adding-a-provider
  */
@@ -9,10 +9,8 @@ export type MediaKind = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT";
 
 /** How the browser should send the file. The client uploader (client/upload.ts) implements each. */
 export type UploadInstruction =
-  /** Presigned / signed URL: PUT the raw file body (S3, R2, Mux, local dev). */
+  /** Signed URL: PUT the raw file body (local dev). */
   | { strategy: "put"; url: string; headers?: Record<string, string> }
-  /** multipart/form-data POST with the file under `fieldName` (Cloudflare Stream direct upload). */
-  | { strategy: "form-post"; url: string; fieldName: string }
   /** Vercel Blob client upload with a short-lived scoped token. */
   | { strategy: "vercel-blob"; pathname: string; token: string; contentType: string };
 
@@ -21,14 +19,13 @@ export type AssetState = "UPLOADING" | "PROCESSING" | "READY" | "ERRORED";
 /** What a provider reports about an uploaded object. Persisted onto the Asset row. */
 export type ProviderResult = {
   status: Exclude<AssetState, "UPLOADING">;
-  /** Public URL: the file itself for images/docs, the poster frame for streamed video. */
+  /** Public URL of the file */
   url?: string;
-  playbackId?: string;
   duration?: number;
   width?: number;
   height?: number;
   bytes?: number;
-  /** Extra delivery info, e.g. { hls, mp4, assetId } — stored in Asset.meta. */
+  /** Extra provider info — stored in Asset.meta. */
   meta?: Record<string, unknown>;
 };
 
@@ -41,12 +38,10 @@ export type CreateUploadInput = {
   kind: MediaKind;
 };
 
-export type WebhookUpdate = { providerKey: string; result: ProviderResult };
-
 /**
  * Server-side imports (Google Drive → provider) move a file in fixed-size chunks so a multi-GB master
  * never sits in memory or in a request body, and a failed chunk retries without starting over.
- * 16 MiB: a multiple of 256 KiB (Mux/GCS, tus) and above the 5 MiB multipart minimum (S3, R2, Blob).
+ * 16 MiB: above the 5 MiB multipart minimum (Blob), and every part but the last is the same size.
  */
 export const IMPORT_CHUNK_BYTES = 16 * 1024 * 1024;
 
@@ -94,7 +89,7 @@ export interface StorageProvider {
   /** Stored in Asset.provider. Never rename once assets exist. */
   readonly id: string;
   readonly label: string;
-  /** Kinds this provider can hold. Streaming providers are VIDEO-only. */
+  /** Kinds this provider can hold. */
   readonly kinds: readonly MediaKind[];
   /** Env vars that must be set for the provider to be usable (checked by `pnpm media:check`). */
   readonly requiredEnv: readonly string[];
@@ -105,13 +100,11 @@ export interface StorageProvider {
   createUpload(
     input: CreateUploadInput,
   ): Promise<{ providerKey: string; upload: UploadInstruction }>;
-  /** Called after the browser finishes uploading; returns READY or PROCESSING (transcoding). */
+  /** Called after the browser finishes uploading; returns READY (or ERRORED). */
   finalize(providerKey: string, kind: MediaKind): Promise<ProviderResult>;
   delete(providerKey: string): Promise<void>;
   /** Raw bytes for image analysis (blur placeholder, dominant colour). Defaults to fetching `url`. */
   read?(providerKey: string): Promise<Buffer>;
-  /** Verify + parse a provider webhook. Return null for events we don't care about. Throw on bad signature. */
-  webhook?(request: Request): Promise<WebhookUpdate | null>;
   /** Cheap authenticated call proving the credentials work. Returns a short status line. */
   check?(): Promise<string>;
   /** Server-to-server chunked writes, for imports (Google Drive). Providers without one can't be import targets. */

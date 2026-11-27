@@ -77,6 +77,17 @@ describe("media server actions", () => {
     expect(result).toMatchObject({ id: cuid, status: "READY", url: "https://cdn/x" });
   });
 
+  it("passes a range-checked video probe to the service", async () => {
+    requireAdmin.mockResolvedValue({});
+    service.completeUpload.mockResolvedValue({ id: cuid, status: "READY" });
+    await completeUploadAction(cuid, { width: 1080, height: 1920, duration: 4.5 });
+    expect(service.completeUpload).toHaveBeenLastCalledWith(cuid, { width: 1080, height: 1920, duration: 4.5 });
+    await completeUploadAction(cuid, { width: -1, height: 99999, duration: 9000 } as never);
+    expect(service.completeUpload).toHaveBeenLastCalledWith(cuid, {});
+    await completeUploadAction(cuid);
+    expect(service.completeUpload).toHaveBeenLastCalledWith(cuid, {});
+  });
+
   it("deleting an asset refreshes everything that can show it", async () => {
     requireAdmin.mockResolvedValue({});
     await deleteAssetAction(cuid);

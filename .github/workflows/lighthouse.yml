@@ -26,7 +26,7 @@ jobs:
           base="${BASE%/}"
           {
             echo "list<<EOF"
-            for path in / /work /about /contact /work/resonance; do echo "$base$path"; done
+            for path in / /work /about /contact /work/resonance /work/night-shift /work/label/fashion; do echo "$base$path"; done
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 

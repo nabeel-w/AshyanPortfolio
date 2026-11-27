@@ -4,10 +4,11 @@ const db = vi.hoisted(() => ({
   project: { findFirst: vi.fn(), findMany: vi.fn() },
   page: { findFirst: vi.fn() },
   client: { findMany: vi.fn() },
+  label: { count: vi.fn(async () => 0), findMany: vi.fn(async () => []) },
 }));
 vi.mock("@/lib/db", () => ({ db }));
 
-const { getProject, getProjectSlugs } = await import("./projects");
+const { getProject, getProjectSlugs, projectMeta } = await import("./projects");
 
 const ready = (over: object = {}) => ({ status: "READY", url: "https://cdn/c.webp", alt: "Cover", width: 1600, height: 900, blurDataUrl: "data:x", ...over });
 
@@ -24,17 +25,24 @@ const row = {
   createdAt: new Date("2023-01-01"),
   updatedAt: new Date("2023-02-01"),
   publishedAt: new Date("2023-06-01"),
-  category: { name: "Fashion" },
+  labels: [
+    { order: 0, label: { name: "Fashion", slug: "fashion", visible: true } },
+    { order: 1, label: { name: "Reels", slug: "reels", visible: false } },
+  ],
   cover: ready(),
-  film: { status: "READY", playbackId: "pb_film", duration: 20.1, url: "https://image.mux.com/pb_film/thumbnail.webp", meta: { aspectRatio: 16 / 9 } },
-  loop: { status: "READY", playbackId: "pb_loop" },
+  filmUrl: "https://youtu.be/dQw4w9WgXcQ?t=5",
+  filmYoutubeId: "dQw4w9WgXcQ",
+  filmOrientation: "LANDSCAPE",
+  filmAspect: null,
+  filmDuration: 20.1,
+  loop: { status: "READY", kind: "VIDEO", url: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 1080, height: 1920 },
   gallery: [{ asset: ready({ url: "https://cdn/g1.webp" }) }, { asset: ready({ status: "PROCESSING" }) }],
 };
 
 beforeEach(() => {
   db.project.findMany.mockResolvedValue([
-    { slug: "resonance", title: "Résonance", cover: ready() },
-    { slug: "mumbai", title: "Mumbai", cover: ready({ url: "https://cdn/m.webp" }) },
+    { slug: "resonance", title: "Résonance", createdAt: new Date("2023-01-01"), labels: [], cover: ready() },
+    { slug: "mumbai", title: "Mumbai", createdAt: new Date("2022-01-01"), labels: [], cover: ready({ url: "https://cdn/m.webp" }) },
   ]);
   db.page.findFirst.mockResolvedValue(null);
   db.client.findMany.mockResolvedValue([]);
@@ -47,11 +55,25 @@ describe("getProject", () => {
     expect(p).toMatchObject({
       slug: "resonance",
       category: "Fashion",
+      labels: [
+        { name: "Fashion", slug: "fashion", visible: true },
+        { name: "Reels", slug: "reels", visible: false },
+      ],
       story: ["First paragraph.", "Second paragraph."],
       credits: [{ role: "Editor", name: "Ashyan Zafar" }],
       cover: { src: "https://cdn/c.webp", alt: "Cover", blurDataUrl: "data:x" },
-      film: { playbackId: "pb_film", duration: 20.1, aspectRatio: 16 / 9 },
-      loopPlaybackId: "pb_loop",
+      film: {
+        youtubeId: "dQw4w9WgXcQ",
+        kind: "video",
+        orientation: "landscape",
+        aspect: 16 / 9,
+        duration: 20.1,
+        start: 5,
+        embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        watchUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        poster: { src: "https://cdn/c.webp" },
+      },
+      loop: { src: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 1080, height: 1920 },
       next: { slug: "mumbai", title: "Mumbai" },
     });
     // gallery skips assets that aren't ready yet
@@ -64,9 +86,20 @@ describe("getProject", () => {
     expect(db.project.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: "resonance", status: "PUBLISHED" } }));
   });
 
-  it("hides a film that is still processing", async () => {
-    db.project.findFirst.mockResolvedValue({ ...row, film: { ...row.film, status: "PROCESSING" } });
+  it("has no film without a valid YouTube URL, or when the stored id disagrees with it", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, filmUrl: null });
     expect((await getProject("resonance"))!.film).toBeUndefined();
+    db.project.findFirst.mockResolvedValue({ ...row, filmUrl: "https://youtube.com.evil.io/watch?v=dQw4w9WgXcQ" });
+    expect((await getProject("resonance"))!.film).toBeUndefined();
+    db.project.findFirst.mockResolvedValue({ ...row, filmYoutubeId: "aaaaaaaaaaa" });
+    expect((await getProject("resonance"))!.film).toBeUndefined();
+  });
+
+  it("gives Shorts a portrait 9:16 box, and honours an exact aspect", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, filmUrl: "https://youtube.com/shorts/dQw4w9WgXcQ", filmOrientation: "PORTRAIT" });
+    expect((await getProject("resonance"))!.film).toMatchObject({ kind: "short", orientation: "portrait", aspect: 9 / 16, watchUrl: "https://www.youtube.com/shorts/dQw4w9WgXcQ" });
+    db.project.findFirst.mockResolvedValue({ ...row, filmAspect: 2.39 });
+    expect((await getProject("resonance"))!.film!.aspect).toBe(2.39);
   });
 
   it("tolerates malformed credits JSON", async () => {
@@ -84,6 +117,22 @@ describe("getProject", () => {
     db.project.findMany.mockResolvedValue([]);
     expect(await getProject("the-next-chapter")).toMatchObject({ slug: "the-next-chapter", title: "The Next Chapter" });
     expect(await getProject("does-not-exist")).toBeNull();
+  });
+});
+
+describe("project SEO fields (#31)", () => {
+  it("carries the admin SEO title and description", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, seoTitle: " Résonance, a fashion film ", seoDescription: "Custom description." });
+    const p = (await getProject("resonance"))!;
+    expect(p).toMatchObject({ seoTitle: "Résonance, a fashion film", seoDescription: "Custom description." });
+    expect(projectMeta(p)).toEqual({ title: "Résonance, a fashion film", description: "Custom description." });
+  });
+
+  it("falls back to Title — Format and the summary when the fields are empty", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, seoTitle: "", seoDescription: null });
+    const p = (await getProject("resonance"))!;
+    expect(projectMeta(p)).toEqual({ title: "Résonance — Fashion Film", description: "Short summary." });
+    expect(projectMeta({ ...p, summary: "" }).description).toBe("Résonance, a fashion film edited by Ashyan Zafar.");
   });
 });
 

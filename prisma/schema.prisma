@@ -102,14 +102,12 @@ enum AssetStatus {
 model Asset {
   id           String        @id @default(cuid())
   kind         AssetKind
-  /// Storage adapter id ("mux", "s3", "vercel-blob", "cloudflare-stream", "local"…) — see src/features/media/providers
+  /// Storage adapter id ("vercel-blob", "local") — see src/features/media/providers
   provider     String
   status       AssetStatus   @default(UPLOADING)
-  /// Provider-side id (Mux asset id, blob pathname, R2 key…)
+  /// Provider-side id (blob pathname, local key)
   providerKey  String
-  /// Streaming id (Mux playback id / Stream uid) — videos only
-  playbackId   String?
-  /// Direct CDN URL for images / documents
+  /// Public URL of the file (images, logos, hover loops, documents)
   url          String?
   filename     String
   mimeType     String
@@ -125,13 +123,12 @@ model Asset {
   dominantColor String?
   alt          String        @default("")
   caption      String?
-  /// Free-form provider metadata (renditions, aspect ratio, captions track ids…)
+  /// Free-form provider metadata (import source…)
   meta         Json?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   projectCovers   Project[] @relation("ProjectCover")
-  projectFilms    Project[] @relation("ProjectFilm")
   projectLoops    Project[] @relation("ProjectLoop")
   projectGallery  ProjectMedia[]
   clientLogos     Client[]
@@ -186,12 +183,55 @@ enum PublishStatus {
   ARCHIVED
 }
 
-model Category {
-  id       String    @id @default(cuid())
-  name     String
-  slug     String    @unique
-  order    Int       @default(0)
-  projects Project[]
+/// The film's shape: drives the bento tile, the project page layout and the player box (docs/03)
+enum VideoOrientation {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
+}
+
+/// Bento tile override for a project (#29). AUTO = from the film's orientation (src/features/sections/bento.ts)
+enum CardSize {
+  AUTO
+  FEATURE
+  WIDE
+  TALL
+  SQUARE
+}
+
+/// A managed work label ("Fashion", "Reels"…). Several per project; each visible label with work has
+/// an indexable page at /work/label/<slug>. See docs/02 "Labels".
+model Label {
+  id             String         @id @default(cuid())
+  name           String
+  slug           String         @unique
+  /// Old slugs after a rename: /work/label/<old> permanently redirects to the current slug
+  previousSlugs  String[]       @default([])
+  /// 1–2 sentence intro for the landing page (crawlable, GEO)
+  description    String?
+  order          Int            @default(0)
+  /// Hidden = not a chip and no landing page, but still on its projects
+  visible        Boolean        @default(true)
+  seoTitle       String?
+  seoDescription String?
+  projects       ProjectLabel[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([order])
+}
+
+model ProjectLabel {
+  projectId String
+  labelId   String
+  /// 0 = primary (card tag, breadcrumb, related work)
+  order     Int     @default(0)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, labelId])
+  @@index([labelId])
+  @@index([projectId, order])
 }
 
 model Project {
@@ -212,31 +252,40 @@ model Project {
   body        Json?
   credits     Json?         // [{ role, name }]
   featured    Boolean       @default(false)
+  /// Work-grid tile shape; AUTO picks it from the film orientation
+  cardSize    CardSize      @default(AUTO)
   order       Int           @default(0)
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?
 
-  categoryId  String?
-  category    Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
   coverId     String?
   cover       Asset?        @relation("ProjectCover", fields: [coverId], references: [id], onDelete: SetNull)
-  /// Full-length film (HLS)
-  filmId      String?
-  film        Asset?        @relation("ProjectFilm", fields: [filmId], references: [id], onDelete: SetNull)
+  /// Canonical YouTube URL as entered (watch, youtu.be, /shorts/, /embed/, /live/). See src/lib/youtube.ts
+  filmUrl         String?
+  /// 11-char YouTube video id parsed from filmUrl
+  filmYoutubeId   String?
+  filmOrientation VideoOrientation @default(LANDSCAPE)
+  /// width / height, e.g. 1.7778 or 0.5625. Null = derive from the orientation
+  filmAspect      Float?
+  /// Seconds. YouTube oEmbed has no duration, so the admin types the runtime
+  filmDuration    Float?
   /// Short muted loop for hover previews on the grid
   loopId      String?
   loop        Asset?        @relation("ProjectLoop", fields: [loopId], references: [id], onDelete: SetNull)
 
   gallery     ProjectMedia[]
+  labels      ProjectLabel[]
 
   seoTitle       String?
   seoDescription String?
+  /// Share card override (headline, background, template) — share.ts pageShareSchema
+  share          Json?
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@index([status, featured, order])
+  @@index([filmYoutubeId])
 }
 
 model ProjectMedia {
@@ -273,7 +322,8 @@ model Page {
   title          String
   seoTitle       String?
   seoDescription String?
-  ogImageUrl     String?
+  /// Per-page share card override (background, headline, meta, template) — share.ts pageShareSchema
+  share          Json?
   status         PublishStatus @default(DRAFT)
   publishedAt    DateTime?
   sections       Section[]
@@ -322,7 +372,6 @@ model SiteSettings {
   id            String   @id @default("site")
   name          String   @default("Ashyan Zafar")
   role          String   @default("Film Editor")
-  tagline       String?
   location      String?
   email         String?
   socials       Json?    // [{ label, url }]
@@ -332,6 +381,9 @@ model SiteSettings {
   /// E.164 number for the floating WhatsApp button, e.g. "+91 83349 08607"
   whatsapp        String?
   whatsappMessage String?
+  /// Share card + search/social defaults (Settings → Sharing & SEO), validated by
+  /// src/features/seo/share.ts siteShareSchema. Null = today's defaults (hero still + headline).
+  share           Json?
   updatedAt     DateTime @updatedAt
 }
 

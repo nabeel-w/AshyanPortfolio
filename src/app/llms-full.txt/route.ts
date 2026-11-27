@@ -52,6 +52,7 @@ export async function GET() {
         `${p.format}, ${p.year}`,
         p.clientName && `client: ${p.clientName}`,
         p.role && `role: ${p.role}`,
+        p.labels.length && `labels: ${p.labels.map((l) => l.name).join(", ")}`,
         p.film?.duration && `runtime ${clockDuration(p.film.duration)}`,
       ]
         .filter(Boolean)

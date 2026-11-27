@@ -11,7 +11,6 @@ export type AssetSummary = {
   width: number | null;
   height: number | null;
   blurDataUrl: string | null;
-  playbackId: string | null;
   duration: number | null;
   bytes: number | null;
   createdAt: string;
@@ -37,7 +36,6 @@ export function toAssetSummary(a: Asset & { import?: AssetImport | null }): Asse
     width: a.width,
     height: a.height,
     blurDataUrl: a.blurDataUrl,
-    playbackId: a.playbackId,
     duration: a.duration,
     bytes: a.bytes === null ? null : Number(a.bytes),
     createdAt: a.createdAt.toISOString(),

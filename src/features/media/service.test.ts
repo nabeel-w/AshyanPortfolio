@@ -22,7 +22,6 @@ const fake = vi.hoisted(() => {
     finalize: vi.fn(),
     delete: vi.fn(),
     read: vi.fn(),
-    webhook: vi.fn(),
   };
   return { provider };
 });
@@ -37,7 +36,7 @@ vi.mock("./providers", () => ({
 const analyzeImage = vi.hoisted(() => vi.fn());
 vi.mock("./image-meta", () => ({ analyzeImage }));
 
-const { applyWebhook, completeUpload, createUpload, deleteAsset } = await import("./service");
+const { completeUpload, createUpload, deleteAsset } = await import("./service");
 const provider = fake.provider;
 
 beforeEach(() => {
@@ -63,6 +62,25 @@ describe("createUpload", () => {
     await expect(
       createUpload({ filename: "empty.png", mimeType: "image/png", bytes: 0 }),
     ).rejects.toThrow();
+  });
+
+  it("holds hover loops to small MP4/WebM files (#26)", async () => {
+    vi.stubEnv("MEDIA_MAX_LOOP_MB", "5");
+    await expect(
+      createUpload({ filename: "loop.mov", mimeType: "video/quicktime", bytes: 1000, purpose: "loop" }),
+    ).rejects.toThrow("must be an MP4 (H.264) or WebM file");
+    await expect(
+      createUpload({ filename: "loop.mp4", mimeType: "video/mp4", bytes: 6 * 1024 * 1024, purpose: "loop" }),
+    ).rejects.toThrow(/under 5 MB/);
+    await expect(
+      createUpload({ filename: "still.webp", mimeType: "image/webp", bytes: 100, purpose: "loop" }),
+    ).rejects.toThrow(/MP4/);
+    expect(provider.createUpload).not.toHaveBeenCalled();
+    provider.createUpload.mockResolvedValue({ providerKey: "pk", upload: { strategy: "put", url: "https://up" } });
+    db.asset.create.mockResolvedValue({ id: "asset_1" });
+    await expect(
+      createUpload({ filename: "loop.webm", mimeType: "video/webm", bytes: 3 * 1024 * 1024, purpose: "loop" }),
+    ).resolves.toMatchObject({ kind: "VIDEO" });
   });
 
   it("asks the provider for an upload instruction and records an UPLOADING asset", async () => {
@@ -165,33 +183,28 @@ describe("completeUpload", () => {
   });
 });
 
-describe("applyWebhook", () => {
-  const req = new Request("https://x", { method: "POST", body: "{}" });
-
-  it("updates the matching asset by (provider, providerKey)", async () => {
-    provider.webhook.mockResolvedValue({
-      providerKey: "pk",
-      result: { status: "READY", playbackId: "pb" },
-    });
-    db.asset.findUnique.mockResolvedValue({ id: "asset_1" });
-
-    const asset = await applyWebhook("fake", req);
-    expect(db.asset.findUnique).toHaveBeenCalledWith({
-      where: { provider_providerKey: { provider: "fake", providerKey: "pk" } },
-    });
-    expect(asset).toMatchObject({ status: "READY", playbackId: "pb" });
+describe("completeUpload: video shape (#24)", () => {
+  it("stores the browser probe on a video when the provider reports no dimensions", async () => {
+    db.asset.findUniqueOrThrow.mockResolvedValue({ id: "asset_1", kind: "VIDEO", provider: "fake", providerKey: "pk" });
+    provider.finalize.mockResolvedValue({ status: "READY", url: "https://blob/loop.mp4", bytes: 4_000_000 });
+    const asset = await completeUpload("asset_1", { width: 1080, height: 1920, duration: 4.2 });
+    expect(asset).toMatchObject({ status: "READY", width: 1080, height: 1920, duration: 4.2 });
   });
 
-  it("ignores events for assets this app didn't create", async () => {
-    provider.webhook.mockResolvedValue({ providerKey: "unknown", result: { status: "READY" } });
-    db.asset.findUnique.mockResolvedValue(null);
-    expect(await applyWebhook("fake", req)).toBeNull();
-    expect(db.asset.update).not.toHaveBeenCalled();
+  it("prefers what the provider reports over the probe", async () => {
+    db.asset.findUniqueOrThrow.mockResolvedValue({ id: "asset_1", kind: "VIDEO", provider: "fake", providerKey: "pk" });
+    provider.finalize.mockResolvedValue({ status: "READY", width: 1920, height: 1080, duration: 10 });
+    const asset = await completeUpload("asset_1", { width: 1, height: 2, duration: 3 });
+    expect(asset).toMatchObject({ width: 1920, height: 1080, duration: 10 });
   });
 
-  it("propagates signature failures", async () => {
-    provider.webhook.mockRejectedValue(new Error("Invalid signature"));
-    await expect(applyWebhook("fake", req)).rejects.toThrow(/Invalid signature/);
+  it("ignores the probe for images", async () => {
+    db.asset.findUniqueOrThrow.mockResolvedValue({ id: "asset_1", kind: "IMAGE", provider: "fake", providerKey: "pk" });
+    provider.finalize.mockResolvedValue({ status: "READY", url: "https://cdn/x.png" });
+    provider.read.mockResolvedValue(Buffer.from("img"));
+    analyzeImage.mockResolvedValue({ width: 10, height: 5 });
+    const asset = await completeUpload("asset_1", { width: 999, height: 999 });
+    expect(asset).toMatchObject({ width: 10, height: 5 });
   });
 });
 

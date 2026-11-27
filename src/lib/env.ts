@@ -8,7 +8,7 @@ import { z } from "zod";
 // Empty string = unset (the .env.example ships blank values). Keep the list in sync with media/providers.
 const mediaProvider = z.preprocess(
   (v) => (v === "" ? undefined : v),
-  z.enum(["local", "s3", "vercel-blob", "mux", "cloudflare-stream"]).optional(),
+  z.enum(["local", "vercel-blob"]).optional(),
 );
 
 const optional = z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional());

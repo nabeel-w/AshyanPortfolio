@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { ProjectForm } from "@/components/admin/project-form";
+import { clockDuration } from "@/features/media/delivery";
+import { parsePageShare } from "@/features/seo/share";
 import { toAssetSummary } from "@/features/media/summary";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
@@ -9,13 +11,13 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
   // authorize itself rather than rely on the layout guard. Also makes the page request-time.
   await requireAdmin();
   const { id } = await params;
+  const labelOptions = await db.label.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }], select: { id: true, name: true, slug: true } });
   const p = await db.project.findUnique({
     where: { id },
     include: {
       cover: true,
-      film: true,
       loop: true,
-      category: true,
+      labels: { include: { label: true }, orderBy: { order: "asc" } },
       gallery: { include: { asset: true }, orderBy: { order: "asc" } },
     },
   });
@@ -24,11 +26,12 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
   return (
     <ProjectForm
       id={p.id}
+      labelOptions={labelOptions}
       initial={{
         title: p.title,
         slug: p.slug,
         format: p.format ?? "",
-        category: p.category?.name ?? "",
+        labels: p.labels.map((pl) => ({ id: pl.label.id, name: pl.label.name, slug: pl.label.slug })),
         clientName: p.clientName ?? "",
         year: p.year ?? undefined,
         role: p.role ?? "",
@@ -37,12 +40,17 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
         transcript: p.transcript ?? "",
         credits,
         featured: p.featured,
+        cardSize: p.cardSize,
         order: p.order,
         status: p.status,
         seoTitle: p.seoTitle ?? "",
         seoDescription: p.seoDescription ?? "",
+        share: parsePageShare(p.share),
         cover: p.cover ? toAssetSummary(p.cover) : null,
-        film: p.film ? toAssetSummary(p.film) : null,
+        filmUrl: p.filmUrl ?? "",
+        filmOrientation: p.filmOrientation,
+        filmAspect: p.filmAspect,
+        filmRuntime: p.filmDuration ? clockDuration(p.filmDuration) : "",
         loop: p.loop ? toAssetSummary(p.loop) : null,
         gallery: p.gallery.map((g) => toAssetSummary(g.asset)),
       }}
