@@ -41,3 +41,19 @@ Target: Lighthouse 100 for SEO, Accessibility and Best Practices, and 95+ for Pe
 | JS on home | ≤ 40 KB gz | Cursor, timecode, menu, beacon, lazy video only |
 
 Check with `next build` output, Speed Insights in production, and Lighthouse CI on preview deployments.
+
+## Share cards (Settings → Sharing & SEO, #33)
+
+Every share image comes from one renderer (`features/seo/og-template.tsx`, Satori → mozjpeg ≈ 100 KB) and is served at `/og/<page|project|label>/<slug>`. Pages point `og:image` / `twitter:image` at it **with `?v=<content hash>`**, so editing a card changes its URL and WhatsApp, LinkedIn, X and Facebook fetch it again. With nothing customised the cards are byte-identical to the pre-v2 ones.
+
+- **Templates**: *still* (background + ink gradient + headline with the `*red italic*` accent), *type* (ink only), *portrait* (the 9:16 still on the left and a title panel; the default for reels).
+- **Precedence**: the page's or project's override → Settings → the home hero → the built-in fallback. Projects default to their cover and title. Label pages get "<Label> *work.*".
+- **Settings fields**: template, background (+ focal point kept in frame by the crop), overlay strength, headline, meta line, monogram/wordmark, alt text; plus the site-wide **title template** (`%s — {name}`), **default description** and **X handle** (`twitter:site` / `twitter:creator`).
+- **Preview**: `POST /api/admin/og-preview` renders the unsaved draft with the production renderer and encoder (admin-only, `no-store`, `noindex`, fonts fetched uncached), framed as WhatsApp, iMessage, LinkedIn, X and a Google result, with the JPEG size checked against WhatsApp's 300 KB limit. Checks warn about long or wrapping headlines, small/portrait backgrounds without a focal point, card size, and title/description lengths.
+- After saving: links to the Facebook Sharing Debugger and LinkedIn Post Inspector, and a "Copy test link" button.
+
+## Labels and video (v2)
+
+- **Label pages** `/work/label/<slug>` are static and indexable: their own title, description and canonical, `CollectionPage` + `ItemList` + `BreadcrumbList` JSON-LD, listed in the sitemap and in `llms.txt` ("Work by label"). Renamed labels keep redirecting (`Label.previousSlugs`, 308).
+- **Project JSON-LD** adds `keywords` (all labels), `genre` (format + primary label) and a label step in the breadcrumb.
+- **VideoObject** points at the YouTube player (`embedUrl`), lists the cover and the `i.ytimg.com` thumbnail, gives a nominal `width`/`height` from the film's aspect, and has **no `contentUrl`** (we don't host the file). The video sitemap uses `player_loc`.

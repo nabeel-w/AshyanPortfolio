@@ -14,7 +14,7 @@ describe("provider registry", () => {
 
   it("throws a helpful error for unknown ids", () => {
     expect(() => getProvider("dropbox")).toThrow(
-      /Unknown media provider "dropbox". Known: local, s3/,
+      /Unknown media provider "dropbox". Known: local, vercel-blob/,
     );
   });
 });
@@ -34,17 +34,17 @@ describe("providerIdFor (routing)", () => {
   });
 
   it("routes each kind to its configured provider", () => {
-    vi.stubEnv("MEDIA_VIDEO_PROVIDER", "mux");
-    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "s3");
-    expect(providerIdFor("VIDEO")).toBe("mux");
-    expect(providerIdFor("IMAGE")).toBe("s3");
+    vi.stubEnv("MEDIA_VIDEO_PROVIDER", "local");
+    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "vercel-blob");
+    expect(providerIdFor("VIDEO")).toBe("local");
+    expect(providerIdFor("IMAGE")).toBe("vercel-blob");
     // files default to the image provider
-    expect(providerIdFor("DOCUMENT")).toBe("s3");
-    expect(providerIdFor("AUDIO")).toBe("s3");
+    expect(providerIdFor("DOCUMENT")).toBe("vercel-blob");
+    expect(providerIdFor("AUDIO")).toBe("vercel-blob");
   });
 
   it("lets files use their own provider", () => {
-    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "s3");
+    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "local");
     vi.stubEnv("MEDIA_FILE_PROVIDER", "vercel-blob");
     expect(providerIdFor("DOCUMENT")).toBe("vercel-blob");
   });
@@ -62,22 +62,17 @@ describe("providerIdFor (routing)", () => {
 });
 
 describe("providerFor (validation)", () => {
-  it("rejects a provider that can't hold the kind", () => {
-    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "mux");
-    expect(() => providerFor("IMAGE")).toThrow(/"mux" can't store IMAGE files/);
-  });
-
   it("lists exactly which env vars are missing", () => {
-    vi.stubEnv("MEDIA_VIDEO_PROVIDER", "mux");
-    vi.stubEnv("MUX_TOKEN_ID", "id");
-    vi.stubEnv("MUX_TOKEN_SECRET", "");
-    expect(() => providerFor("VIDEO")).toThrow(/missing env: MUX_TOKEN_SECRET\./);
+    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "vercel-blob");
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    expect(() => providerFor("IMAGE")).toThrow(/missing env: BLOB_READ_WRITE_TOKEN./);
   });
 
-  it("returns the provider when fully configured", () => {
-    vi.stubEnv("MEDIA_VIDEO_PROVIDER", "mux");
-    vi.stubEnv("MUX_TOKEN_ID", "id");
-    vi.stubEnv("MUX_TOKEN_SECRET", "secret");
-    expect(providerFor("VIDEO").id).toBe("mux");
+  it("returns the provider when fully configured, for every kind (Blob holds images and loops)", () => {
+    vi.stubEnv("MEDIA_IMAGE_PROVIDER", "vercel-blob");
+    vi.stubEnv("MEDIA_VIDEO_PROVIDER", "");
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_x");
+    expect(providerFor("IMAGE").id).toBe("vercel-blob");
+    expect(providerFor("VIDEO").id).toBe("vercel-blob");
   });
 });

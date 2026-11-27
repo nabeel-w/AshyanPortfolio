@@ -68,11 +68,6 @@ async function send(upload: UploadInstruction, file: File, opts: { onProgress?: 
   switch (upload.strategy) {
     case "put":
       return xhr("PUT", upload.url, file, { "Content-Type": file.type, ...upload.headers }, opts);
-    case "form-post": {
-      const form = new FormData();
-      form.append(upload.fieldName, file);
-      return xhr("POST", upload.url, form, {}, opts);
-    }
     case "vercel-blob": {
       const { put } = await import("@vercel/blob/client");
       await put(upload.pathname, file, {

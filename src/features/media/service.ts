@@ -16,11 +16,10 @@ import {
 } from "./util";
 
 /**
- * The upload pipeline, provider-agnostic. Auth is NOT checked here — callers are
- * admin Server Actions (actions.ts) or signature-verified webhooks.
+ * The upload pipeline, provider-agnostic. Auth is NOT checked here — callers are admin Server
+ * Actions (actions.ts), the signed import route and scripts.
  *
- *   createUpload → browser uploads directly to the provider → completeUpload
- *   (streaming video may stay PROCESSING until the provider's webhook calls applyWebhook)
+ *   createUpload → browser uploads directly to the provider → completeUpload (READY)
  */
 
 export type UploadRequest = { filename: string; mimeType: string; bytes: number; purpose?: UploadPurpose };
@@ -101,7 +100,6 @@ function toUpdate(result: ProviderResult): Prisma.AssetUpdateInput {
   return {
     status: result.status,
     url: result.url,
-    playbackId: result.playbackId,
     duration: result.duration,
     width: result.width,
     height: result.height,
@@ -134,22 +132,9 @@ export async function completeUpload(assetId: string, probe: MediaProbe = {}) {
   });
 }
 
-/** Verify + apply a provider webhook. Returns the updated asset, or null if the event was ignored. */
-export async function applyWebhook(providerId: string, request: Request) {
-  const provider = getProvider(providerId);
-  if (!provider.webhook) throw new Error(`Provider "${providerId}" has no webhook handler`);
-  const update = await provider.webhook(request);
-  if (!update) return null;
-  const asset = await db.asset.findUnique({
-    where: { provider_providerKey: { provider: provider.id, providerKey: update.providerKey } },
-  });
-  if (!asset) return null; // upload created outside this app
-  return db.asset.update({ where: { id: asset.id }, data: toUpdate(update.result) });
-}
-
 /**
  * Server-side upload of an in-memory file through the same provider pipeline the browser uses
- * (seeding, imports). Streaming video may come back PROCESSING — poll `completeUpload` or rely on the webhook.
+ * (seeding, one-off migrations).
  */
 export async function ingest(
   file: Buffer,
@@ -175,10 +160,6 @@ export async function ingest(
       }),
       "ingest PUT",
     );
-  } else if (upload.strategy === "form-post") {
-    const form = new FormData();
-    form.append(upload.fieldName, new Blob([body], { type: meta.mimeType }), meta.filename);
-    await expectOk(await fetch(upload.url, { method: "POST", body: form }), "ingest POST");
   } else {
     const { put } = await import("@vercel/blob/client");
     await put(upload.pathname, new Blob([body], { type: meta.mimeType }), {

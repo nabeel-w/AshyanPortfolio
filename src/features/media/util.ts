@@ -57,22 +57,6 @@ export function safeEqualHex(a: string, b: string): boolean {
   return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
 }
 
-/** Parse "t=123,v1=abc" / "time=123,sig1=abc" style signature headers. */
-export function parseSigHeader(header: string | null): Record<string, string> {
-  return Object.fromEntries(
-    (header ?? "")
-      .split(",")
-      .map((part) => part.trim().split("="))
-      .filter((kv): kv is [string, string] => kv.length === 2 && !!kv[0] && !!kv[1]),
-  );
-}
-
-/** Reject webhooks older than 5 minutes (replay protection). */
-export function freshTimestamp(seconds: string | undefined, toleranceSec = 300): boolean {
-  const t = Number(seconds);
-  return Number.isFinite(t) && Math.abs(Date.now() / 1000 - t) <= toleranceSec;
-}
-
 export async function expectOk(res: Response, what: string): Promise<Response> {
   if (!res.ok) {
     const body = await res.text().catch(() => "");

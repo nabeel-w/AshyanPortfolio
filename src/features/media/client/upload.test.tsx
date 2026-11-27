@@ -82,16 +82,6 @@ describe("uploadFile", () => {
     expect(asset).toMatchObject({ status: "READY" });
   });
 
-  it("form POST: wraps the file in multipart form data under the provider's field name", async () => {
-    actions.createUploadAction.mockResolvedValue({
-      assetId: "a",
-      upload: { strategy: "form-post", url: "https://upload.cf/x", fieldName: "file" },
-    });
-    await uploadFile(file);
-    expect(FakeXHR.last.method).toBe("POST");
-    expect((FakeXHR.last.body as FormData).get("file")).toBeInstanceOf(File);
-  });
-
   it("Vercel Blob: uses the scoped token via the Blob client", async () => {
     actions.createUploadAction.mockResolvedValue({
       assetId: "a",

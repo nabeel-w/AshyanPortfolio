@@ -1,13 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  freshTimestamp,
-  hmac,
-  kindFromMime,
-  makeKey,
-  maxBytes,
-  parseSigHeader,
-  safeEqualHex,
-} from "./util";
+import { hmac, kindFromMime, makeKey, maxBytes, safeEqualHex } from "./util";
 
 describe("kindFromMime", () => {
   it.each([
@@ -73,27 +65,11 @@ describe("makeKey", () => {
 });
 
 describe("signature helpers", () => {
-  it("parses provider signature headers", () => {
-    expect(parseSigHeader("t=123,v1=abc")).toEqual({ t: "123", v1: "abc" });
-    expect(parseSigHeader("time=9, sig1=ff")).toEqual({ time: "9", sig1: "ff" });
-    expect(parseSigHeader(null)).toEqual({});
-    expect(parseSigHeader("garbage")).toEqual({});
-  });
-
   it("compares hex digests in constant time and rejects mismatches", () => {
     const a = hmac("secret", "payload");
     expect(safeEqualHex(a, a)).toBe(true);
     expect(safeEqualHex(a, hmac("other", "payload"))).toBe(false);
     expect(safeEqualHex(a, a.slice(0, 10))).toBe(false);
     expect(safeEqualHex("", "")).toBe(false);
-  });
-
-  it("accepts timestamps inside the replay window only", () => {
-    const now = Math.floor(Date.now() / 1000);
-    expect(freshTimestamp(String(now))).toBe(true);
-    expect(freshTimestamp(String(now - 299))).toBe(true);
-    expect(freshTimestamp(String(now - 600))).toBe(false);
-    expect(freshTimestamp(undefined)).toBe(false);
-    expect(freshTimestamp("abc")).toBe(false);
   });
 });

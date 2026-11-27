@@ -91,7 +91,7 @@ export const homeSections: SectionData[] = [
       labelList: [],
       projects: [
         { slug: "the-next-chapter", title: "The Next Chapter", format: "Brand Film", year: 2024, labels: [L.commercial], featured: true, orientation: "landscape", cardSize: "auto", cover: img("next-chapter", 1672, 941, "Extreme close-up of an eye under dappled leaf shadows with a red glint") },
-        { slug: "night-shift", title: "Night Shift", format: "Reel", year: 2025, labels: [L.reels, L.fashion], featured: true, orientation: "portrait", cardSize: "auto", cover: img("night-shift", 529, 941, "A woman in a dark coat looks up past brutalist concrete, a red rim light on her face") },
+        { slug: "night-shift", title: "Night Shift", format: "Reel", year: 2025, labels: [L.reels, L.fashion], featured: true, orientation: "portrait", cardSize: "auto", cover: img("night-shift", 529, 941, "A woman in a red silk dress turns into the wind against a grey sky") },
         { slug: "monsoon", title: "Monsoon", format: "Reel", year: 2025, labels: [L.reels, L.music], featured: true, orientation: "portrait", cardSize: "auto", cover: img("monsoon", 529, 941, "Mumbai towers under heavy monsoon cloud at dusk") },
         { slug: "resonance", title: "Résonance", format: "Fashion Film", year: 2023, labels: [L.fashion], featured: false, orientation: "landscape", cardSize: "auto", cover: img("resonance", 1672, 941, "Model in a flowing red silk dress on a black-sand coastline") },
         { slug: "drive-further", title: "Drive Further", format: "Commercial", year: 2024, labels: [L.commercial], featured: false, orientation: "landscape", cardSize: "auto", cover: img("drive-further", 1672, 941, "Black sports car under a concrete bridge at night, red tail light on wet asphalt") },

@@ -1,11 +1,13 @@
 /**
  * pnpm seed:media <clips-dir>
  *
- * Pushes the on-brand stand-in media through the REAL storage pipeline and creates demo projects:
- *   - 7 stills from public/media → image provider (Vercel Blob), with blur + dominant colour
- *   - loop-<slug>.mp4 + showreel.mp4 from <clips-dir> → video provider (Mux), waits until READY
- *   - 5 published projects (covers, hover loops, the showreel as the film), categories, credits, story
- * Idempotent: media already ingested (matched by filename) and existing projects are reused.
+ * Pushes the on-brand stand-in media through the REAL storage pipeline and creates the demo projects:
+ *   - stills from public/media → Vercel Blob (blur + dominant colour), incl. two 9:16 reel covers
+ *   - loop-<still>.mp4 from <clips-dir> → Vercel Blob as hover loops (purpose "loop", ffprobe size)
+ *   - 7 published projects: 5 landscape films and 2 reels (YouTube Shorts), labels, credits, story
+ * Films are unlisted YouTube stand-ins (FILMS below), cut from the same footage as each project's loop.
+ * Idempotent: media already ingested (matched by filename) is reused. Existing projects keep their
+ * text, but get the v2 fields (YouTube film, orientation, labels, Blob loop) when those are missing.
  * Replace with real work through /admin before launch.
  */
 import { readFile } from "node:fs/promises";
@@ -21,7 +23,7 @@ const PROJECTS = [
     format: "Brand Film",
     clientName: "Maison Noor",
     year: 2024,
-    category: "Commercial",
+    labels: ["Commercial"],
     role: "Edit · Colour · Sound design",
     summary: "A brand film about beginnings, cut around a single held gaze and the quiet before a decision.",
     story:
@@ -40,7 +42,7 @@ const PROJECTS = [
     format: "Commercial",
     clientName: "Atlas Motors",
     year: 2024,
-    category: "Commercial",
+    labels: ["Commercial"],
     role: "Edit · Sound design",
     summary: "A night-drive commercial cut to engine rhythm, where every cut lands on a beat of the road.",
     story:
@@ -58,7 +60,7 @@ const PROJECTS = [
     format: "Fashion Film",
     clientName: "Atelier Rouge",
     year: 2023,
-    category: "Fashion",
+    labels: ["Fashion"],
     role: "Edit · Colour",
     summary: "A fashion film where a single red dress moves through a monochrome coastline, cut to breath and wind.",
     story:
@@ -76,7 +78,7 @@ const PROJECTS = [
     format: "Short Film",
     clientName: "Independent",
     year: 2023,
-    category: "Film",
+    labels: ["Film"],
     role: "Edit",
     summary: "A short film about the words we never say, built from long takes, smoke and silence.",
     story:
@@ -94,7 +96,7 @@ const PROJECTS = [
     format: "Documentary",
     clientName: "City Stories",
     year: 2022,
-    category: "Documentary",
+    labels: ["Documentary"],
     role: "Edit · Story",
     summary: "A documentary portrait of Mumbai at blue hour, told through the people who keep it awake.",
     story:
@@ -106,7 +108,57 @@ const PROJECTS = [
     still: "mumbai",
     featured: false,
   },
+  {
+    slug: "night-shift",
+    title: "Night Shift",
+    format: "Reel",
+    clientName: "Atelier Rouge",
+    year: 2025,
+    labels: ["Reels", "Fashion"],
+    role: "Edit · Colour",
+    summary: "A vertical cut of the Atelier Rouge campaign: one red dress, one gust of wind, twelve seconds.",
+    story:
+      "Built for Reels and Shorts first, not cropped from the hero film: every shot was re-framed for 9:16 so the dress fills the screen.\n\nThe pace is set by the wind in the fabric rather than the music, which keeps the loop seamless.",
+    credits: [
+      { role: "Creative Director", name: "Léa Martin" },
+      { role: "Editor & Colourist", name: "Ashyan Zafar" },
+    ],
+    still: "night-shift",
+    featured: true,
+  },
+  {
+    slug: "monsoon",
+    title: "Monsoon",
+    format: "Reel",
+    clientName: "City Stories",
+    year: 2025,
+    labels: ["Reels", "Music video"],
+    role: "Edit",
+    summary: "A vertical music piece for the first rain over Mumbai, cut to the sound of the storm rolling in.",
+    story:
+      "A companion reel to Mumbai, My City. The skyline holds while the light changes, and the cut lands on each roll of thunder.",
+    credits: [
+      { role: "Director", name: "Ananya Iyer" },
+      { role: "Editor", name: "Ashyan Zafar" },
+    ],
+    still: "monsoon",
+    featured: true,
+  },
 ];
+
+/** Unlisted YouTube stand-ins (uploaded 2026-11-27), each cut from that project's own footage. */
+const FILMS: Record<string, { url: string; orientation: "LANDSCAPE" | "PORTRAIT"; duration: number }> = {
+  "the-next-chapter": { url: "https://youtu.be/SrDRTk-Rjn8", orientation: "LANDSCAPE", duration: 11.8 },
+  "drive-further": { url: "https://youtu.be/J6PTOXRglIM", orientation: "LANDSCAPE", duration: 11.8 },
+  resonance: { url: "https://youtu.be/hMZKq3msI1k", orientation: "LANDSCAPE", duration: 11.8 },
+  "the-silent-ones": { url: "https://youtu.be/v_U_oxVl1TI", orientation: "LANDSCAPE", duration: 11.8 },
+  "mumbai-my-city": { url: "https://youtu.be/rnmxUrigHHo", orientation: "LANDSCAPE", duration: 11.8 },
+  "night-shift": { url: "https://youtube.com/shorts/aF2EFIDIKGU", orientation: "PORTRAIT", duration: 11.8 },
+  monsoon: { url: "https://youtube.com/shorts/7bFb7t08OW0", orientation: "PORTRAIT", duration: 11.8 },
+};
+
+/** Label order on the site (chips, label pages). */
+const LABELS = ["Commercial", "Reels", "Fashion", "Music video", "Film", "Documentary"];
 
 const STILL_ALTS: Record<string, string> = {
   hero: "A woman in a dark coat looks skyward beside brutalist concrete, a thin red rim light on her profile",
@@ -116,30 +168,48 @@ const STILL_ALTS: Record<string, string> = {
   "silent-ones": "Profile silhouette of a man in backlit smoke",
   mumbai: "Mumbai skyline at blue hour with red aircraft lights on the towers",
   studio: "Ashyan at a dark edit suite, a red playhead on the timeline",
+  "night-shift": "A woman in a red silk dress turns into the wind against a grey sky",
+  monsoon: "Mumbai towers under heavy monsoon cloud at dusk",
 };
+
+/** Width, height and duration of a clip (ffprobe; optional). */
+async function probe(file: string) {
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const { stdout } = await promisify(execFile)("ffprobe", [
+      "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration", "-of", "json", file,
+    ]);
+    const j = JSON.parse(stdout) as { streams?: { width?: number; height?: number }[]; format?: { duration?: string } };
+    return { width: j.streams?.[0]?.width, height: j.streams?.[0]?.height, duration: Number(j.format?.duration) || undefined };
+  } catch {
+    return {};
+  }
+}
 
 async function main() {
   const clipsDir = process.argv[2];
-  if (!clipsDir) throw new Error("Usage: pnpm seed:media <dir with loop-<slug>.mp4 and showreel.mp4>");
+  if (!clipsDir) throw new Error("Usage: pnpm seed:media <dir with loop-<still>.mp4 per project>");
 
   const { db } = await import("../src/lib/db");
   const media = await import("../src/features/media/service");
+  const { parseYouTubeUrl } = await import("../src/lib/youtube");
+  const { slugify } = await import("../src/features/sections/schemas");
 
-  async function ensure(filename: string, load: () => Promise<Buffer>, mimeType: string, alt: string) {
-    const existing = await db.asset.findFirst({ where: { filename, status: { not: "ERRORED" } } });
+  async function ensure(
+    filename: string,
+    load: () => Promise<Buffer>,
+    mimeType: string,
+    alt: string,
+    extra: { purpose?: "loop"; probe?: { width?: number; height?: number; duration?: number } } = {},
+  ) {
+    const existing = await db.asset.findFirst({
+      where: { filename, status: "READY", provider: { not: "mux" } },
+    });
     if (existing) return existing;
-    const asset = await media.ingest(await load(), { filename, mimeType, alt });
+    const asset = await media.ingest(await load(), { filename, mimeType, alt, ...extra });
     console.log(`  ↑ ${filename} → ${asset.provider} (${asset.status})`);
     return asset;
-  }
-
-  async function waitReady(id: string) {
-    for (let i = 0; i < 60; i++) {
-      const a = await media.completeUpload(id);
-      if (a.status === "READY" || a.status === "ERRORED") return a;
-      await new Promise((r) => setTimeout(r, 5000));
-    }
-    throw new Error(`Asset ${id} still processing after 5 minutes`);
   }
 
   console.log("Stills → image provider");
@@ -148,56 +218,74 @@ async function main() {
     stills[name] = await ensure(`seed-${name}.webp`, () => readFile(path.join("public/media", `${name}.webp`)), "image/webp", alt);
   }
 
-  console.log("Clips → video provider");
-  const showreel = await ensure("seed-showreel.mp4", () => readFile(path.join(clipsDir, "showreel.mp4")), "video/mp4", "Ashyan Zafar showreel");
+  console.log("Loops → video provider (Blob)");
   const loops: Record<string, Awaited<ReturnType<typeof ensure>>> = {};
   for (const p of PROJECTS) {
-    loops[p.slug] = await ensure(`seed-loop-${p.still}.mp4`, () => readFile(path.join(clipsDir, `loop-${p.still}.mp4`)), "video/mp4", `${p.title} — preview loop`);
+    const file = path.join(clipsDir, `loop-${p.still}.mp4`);
+    loops[p.slug] = await ensure(`seed-loop-${p.still}.mp4`, () => readFile(file), "video/mp4", `${p.title} — preview loop`, {
+      purpose: "loop",
+      probe: await probe(file),
+    });
   }
 
-  console.log("Waiting for video processing…");
-  for (const a of [showreel, ...Object.values(loops)]) {
-    if (a.status !== "READY") {
-      const done = await waitReady(a.id);
-      console.log(`  ✓ ${done.filename}: ${done.status}${done.playbackId ? ` (${done.playbackId})` : ""}`);
-    }
+  console.log("Labels");
+  const labelIds = new Map<string, string>();
+  for (const [order, name] of LABELS.entries()) {
+    const slug = slugify(name);
+    const l = await db.label.upsert({ where: { slug }, update: { order }, create: { name, slug, order } });
+    labelIds.set(name, l.id);
   }
 
   console.log("Projects");
-  const categories = new Map<string, string>();
-  for (const [i, name] of ["Commercial", "Fashion", "Film", "Documentary"].entries()) {
-    const c = await db.category.upsert({
-      where: { slug: name.toLowerCase() },
-      update: {},
-      create: { name, slug: name.toLowerCase(), order: i },
-    });
-    categories.set(name, c.id);
-  }
   for (const [order, p] of PROJECTS.entries()) {
-    const data = {
-      title: p.title,
-      format: p.format,
-      clientName: p.clientName,
-      year: p.year,
-      role: p.role,
-      summary: p.summary,
-      story: p.story,
-      credits: p.credits,
-      featured: p.featured,
-      order,
-      status: "PUBLISHED" as const,
-      publishedAt: new Date(Date.UTC(p.year, 5, 1)),
-      categoryId: categories.get(p.category)!,
-      coverId: stills[p.still]!.id,
+    const film = FILMS[p.slug]!;
+    const parsed = parseYouTubeUrl(film.url)!;
+    const v2 = {
+      filmUrl: film.url,
+      filmYoutubeId: parsed.id,
+      filmOrientation: film.orientation,
+      filmDuration: film.duration,
       loopId: loops[p.slug]!.id,
-      filmId: showreel.id,
     };
-    const existing = await db.project.findUnique({ where: { slug: p.slug } });
-    if (existing) console.log(`  = ${p.slug} (exists, left unchanged)`);
-    else {
-      await db.project.create({ data: { slug: p.slug, ...data } });
-      console.log(`  + ${p.slug}`);
+    const labels = p.labels.map((name, i) => ({ labelId: labelIds.get(name)!, order: i }));
+    const existing = await db.project.findUnique({
+      where: { slug: p.slug },
+      include: { loop: true, labels: true },
+    });
+    if (existing) {
+      // Keep the text; fill in what v2 needs.
+      await db.project.update({
+        where: { id: existing.id },
+        data: {
+          ...(existing.filmYoutubeId ? {} : { filmUrl: v2.filmUrl, filmYoutubeId: v2.filmYoutubeId, filmOrientation: v2.filmOrientation, filmDuration: v2.filmDuration }),
+          ...(existing.loop && existing.loop.provider !== "mux" ? {} : { loopId: v2.loopId }),
+          ...(existing.labels.length ? {} : { labels: { create: labels } }),
+        },
+      });
+      console.log(`  ~ ${p.slug} (v2 fields filled in)`);
+      continue;
     }
+    await db.project.create({
+      data: {
+        slug: p.slug,
+        title: p.title,
+        format: p.format,
+        clientName: p.clientName,
+        year: p.year,
+        role: p.role,
+        summary: p.summary,
+        story: p.story,
+        credits: p.credits,
+        featured: p.featured,
+        order,
+        status: "PUBLISHED",
+        publishedAt: new Date(Date.UTC(p.year, 5, 1)),
+        coverId: stills[p.still]!.id,
+        ...v2,
+        labels: { create: labels },
+      },
+    });
+    console.log(`  + ${p.slug}`);
   }
   await db.$disconnect();
   console.log("Done.");

@@ -1,12 +1,13 @@
 import { MediaConfigError, type MediaKind, type StorageProvider } from "../types";
-import { cloudflareStream } from "./cloudflare-stream";
 import { local } from "./local";
-import { mux } from "./mux";
-import { s3 } from "./s3";
 import { vercelBlob } from "./vercel-blob";
 
-/** Every available provider. To add one: implement StorageProvider in this folder and list it here. */
-export const providers: readonly StorageProvider[] = [local, s3, vercelBlob, mux, cloudflareStream];
+/**
+ * Every available provider: Vercel Blob in production, local disk in development. Films are YouTube
+ * links (no hosting), so only images, logos and short hover loops are stored (docs/03).
+ * To add one: implement StorageProvider in this folder and list it here.
+ */
+export const providers: readonly StorageProvider[] = [local, vercelBlob];
 
 export function getProvider(id: string): StorageProvider {
   const p = providers.find((x) => x.id === id);

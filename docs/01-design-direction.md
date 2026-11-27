@@ -55,7 +55,7 @@ Editors write headlines with `*italic red*` and `**SANS CAPS**`. `RichText` rend
 ## Motion principles
 
 - **Editing grammar**: cuts, wipes, playheads and timecode. `ease-cut` (`cubic-bezier(.77,0,.175,1)`) for wipes, `ease-out-expo` for reveals.
-- Hover on a work card plays a red playhead sweep, a slow 1.04 zoom and the cursor's PLAY ring. Later the card also plays a muted Mux loop.
+- Hover on a work card plays a red playhead sweep, a slow 1.04 zoom and the cursor's PLAY ring. The card also plays its muted hover loop (a 3–6 s clip on Vercel Blob, in the tile's own shape).
 - Section reveals: fade up 24px, staggered by 60ms, once only. Built with one IntersectionObserver + CSS transitions (no animation library, ~1 KB). Frames and stills use a **wipe**: a cover slides off left→right with a glowing red playhead on its edge. Nothing above the fold is revealed (LCP stays instant).
 - Smooth scroll (Lenis) on desktop only. Native scroll on touch.
 - `prefers-reduced-motion` turns off the marquee, cursor, timecode and reveals.
@@ -78,4 +78,4 @@ Use `svh`/`dvh` instead of `vh`. Never let the page scroll sideways; the marquee
 ## Component inventory
 
 Built: `Hero`, `ClientMarquee`, `WorkGrid`/`WorkCard`, `Statement`, `About`, `ContactCta`, `SiteHeader`, `MobileMenu`, `SiteFooter`, `BladeCursor`, `Timecode`, `RichText`.
-Next: `VideoLoop` (Mux, in-view play), `FilmPlayer` (lazy mux-player in a modal/page), `ProjectHero`, `CreditsList`, `ProjectNav` (prev/next), `Reveal`, `ContactForm`, `ShowreelSection`, `TestimonialSection`, `Preloader` (a short "slate" count-in, first visit only, under 900ms).
+Next: `VideoLoop` (Blob loop, in-view play), `YouTubeFilm` (click-to-load YouTube facade), `ProjectHero`, `CreditsList`, `ProjectNav` (prev/next), `Reveal`, `ContactForm`, `ShowreelSection`, `TestimonialSection`, `Preloader` (a short "slate" count-in, first visit only, under 900ms).

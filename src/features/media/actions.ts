@@ -33,7 +33,6 @@ export async function completeUploadAction(assetId: string, probe?: MediaProbe) 
     kind: asset.kind,
     status: asset.status,
     url: asset.url,
-    playbackId: asset.playbackId,
     width: asset.width,
     height: asset.height,
     duration: asset.duration,

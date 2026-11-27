@@ -19,7 +19,6 @@ const loop: AssetSummary = {
   width: 720,
   height: 1280,
   blurDataUrl: null,
-  playbackId: null,
   duration: 4,
   bytes: 3 * 1024 * 1024,
   createdAt: "2026-11-27T00:00:00.000Z",

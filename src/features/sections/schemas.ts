@@ -7,7 +7,7 @@ import { z } from "zod";
  */
 
 export const mediaRef = z.object({
-  src: z.string(), // asset URL (image) or playback id (video)
+  src: z.string(), // asset URL
   alt: z.string().default(""),
   width: z.number().int().optional(),
   height: z.number().int().optional(),
@@ -29,8 +29,6 @@ export const heroSchema = z.object({
   headline: z.string().default("Crafting visual stories *through edit.*"),
   cta: link.default({ label: "View selected work", href: "#work" }),
   media: mediaRef,
-  /** Optional muted background loop (Mux playback id) */
-  videoPlaybackId: z.string().optional(),
 });
 
 export const clientMarqueeSchema = z.object({

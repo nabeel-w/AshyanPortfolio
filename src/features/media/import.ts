@@ -25,7 +25,7 @@ import { hmac, makeKey, safeEqualHex } from "./util";
  *       read 16 MiB from the source (HTTP Range) → importer.part() → save bytesDone + state
  *   out of time → the route kicks itself again; a failed chunk retries in place, then the whole run
  *   retries later from the last saved chunk; after MAX_ATTEMPTS the import (and asset) fail.
- *   last chunk → importer.complete() → completeUpload() (same finalize/webhook pipeline as browser uploads)
+ *   last chunk → importer.complete() → completeUpload() (same finalize pipeline as browser uploads)
  *
  * A short lease (leaseUntil) makes sure only one runner moves a file at a time. If a function dies,
  * the lease expires and the admin's progress polling (importProgress) kicks the import again.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockDuration, isoDuration, mux } from "./delivery";
+import { clockDuration, isoDuration } from "./delivery";
 
 describe("duration formatting", () => {
   it.each([
@@ -15,12 +15,4 @@ describe("duration formatting", () => {
     [125.4, "2:05"],
     [3725, "1:02:05"],
   ])("clockDuration(%s) = %s", (s, clock) => expect(clockDuration(s)).toBe(clock));
-});
-
-describe("mux URLs", () => {
-  it("builds poster, HLS and MP4 rendition URLs", () => {
-    expect(mux.poster("pb", 2, 640)).toBe("https://image.mux.com/pb/thumbnail.webp?time=2&width=640");
-    expect(mux.hls("pb")).toBe("https://stream.mux.com/pb.m3u8");
-    expect(mux.mp4("pb")).toBe("https://stream.mux.com/pb/highest.mp4");
-  });
 });

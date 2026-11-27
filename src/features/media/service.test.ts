@@ -22,7 +22,6 @@ const fake = vi.hoisted(() => {
     finalize: vi.fn(),
     delete: vi.fn(),
     read: vi.fn(),
-    webhook: vi.fn(),
   };
   return { provider };
 });
@@ -37,7 +36,7 @@ vi.mock("./providers", () => ({
 const analyzeImage = vi.hoisted(() => vi.fn());
 vi.mock("./image-meta", () => ({ analyzeImage }));
 
-const { applyWebhook, completeUpload, createUpload, deleteAsset } = await import("./service");
+const { completeUpload, createUpload, deleteAsset } = await import("./service");
 const provider = fake.provider;
 
 beforeEach(() => {
@@ -206,36 +205,6 @@ describe("completeUpload: video shape (#24)", () => {
     analyzeImage.mockResolvedValue({ width: 10, height: 5 });
     const asset = await completeUpload("asset_1", { width: 999, height: 999 });
     expect(asset).toMatchObject({ width: 10, height: 5 });
-  });
-});
-
-describe("applyWebhook", () => {
-  const req = new Request("https://x", { method: "POST", body: "{}" });
-
-  it("updates the matching asset by (provider, providerKey)", async () => {
-    provider.webhook.mockResolvedValue({
-      providerKey: "pk",
-      result: { status: "READY", playbackId: "pb" },
-    });
-    db.asset.findUnique.mockResolvedValue({ id: "asset_1" });
-
-    const asset = await applyWebhook("fake", req);
-    expect(db.asset.findUnique).toHaveBeenCalledWith({
-      where: { provider_providerKey: { provider: "fake", providerKey: "pk" } },
-    });
-    expect(asset).toMatchObject({ status: "READY", playbackId: "pb" });
-  });
-
-  it("ignores events for assets this app didn't create", async () => {
-    provider.webhook.mockResolvedValue({ providerKey: "unknown", result: { status: "READY" } });
-    db.asset.findUnique.mockResolvedValue(null);
-    expect(await applyWebhook("fake", req)).toBeNull();
-    expect(db.asset.update).not.toHaveBeenCalled();
-  });
-
-  it("propagates signature failures", async () => {
-    provider.webhook.mockRejectedValue(new Error("Invalid signature"));
-    await expect(applyWebhook("fake", req)).rejects.toThrow(/Invalid signature/);
   });
 });
 

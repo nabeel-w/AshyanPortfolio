@@ -29,7 +29,7 @@ Purpose: show Ashyan **what work gets watched, where viewers come from (includin
 
 Metric definitions: visitors = daily-unique visitor hashes, summed over days (the hash rotates daily, so a range can't dedupe across days). Avg watch = mean of the furthest milestone (0/25/50/75/100) reached per played session and film. A project's enquiries = sessions that viewed it and enquired the same day.
 
-**Complement**: Vercel **Speed Insights** (real-user Core Web Vitals) is mounted in the site layout (`@vercel/speed-insights` pinned to 2.0.0); it also has to be switched on in the Vercel project (Speed Insights tab) at launch. Web Analytics is optional. Mux Data covers video quality of experience (startup time, rebuffering).
+**Complement**: Vercel **Speed Insights** (real-user Core Web Vitals) is mounted in the site layout (`@vercel/speed-insights` pinned to 2.0.0); it also has to be switched on in the Vercel project (Speed Insights tab) at launch. Web Analytics is optional. Film plays come from the YouTube player's postMessage stream (features/analytics/youtube.ts): PLAY, 25/50/75 and COMPLETE, the same events as before. Startup time and rebuffering belong to YouTube and aren't measured.
 
 ## 2. Dashboard layout
 

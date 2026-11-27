@@ -273,7 +273,6 @@ function DriveTab({ onChoose }: { onChoose: () => Promise<void> }) {
 
 const STATUS_LABEL: Record<QueueItem["status"], string> = {
   uploading: "",
-  processing: "Processing…",
   done: "Done",
   error: "Failed",
 };

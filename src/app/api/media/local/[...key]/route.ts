@@ -9,7 +9,7 @@ import { safeEqualHex } from "@/features/media/util";
 
 /**
  * Receives PUT uploads for the dev-only "local" provider. Authorised by the signed, expiring URL
- * minted in createUpload — same model as an S3 presigned URL. Disabled in production.
+ * minted in createUpload — same model as a presigned upload URL. Disabled in production.
  */
 export async function PUT(request: Request, { params }: RouteContext<"/api/media/local/[...key]">) {
   if (process.env.NODE_ENV === "production") return new Response("Not found", { status: 404 });

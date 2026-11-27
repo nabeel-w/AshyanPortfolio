@@ -132,7 +132,6 @@ describe("<UploadDialog> · Google Drive", () => {
       .mockResolvedValueOnce([
         { assetId: "asset1", status: "DONE", bytesDone: 100, bytesTotal: 100, error: null },
       ]);
-    media.completeUploadAction.mockResolvedValue({ id: "asset1", status: "READY" });
 
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Harness accept="video/*" />);
@@ -154,10 +153,9 @@ describe("<UploadDialog> · Google Drive", () => {
     await act(() => vi.advanceTimersByTimeAsync(2600));
     expect(within(item).getByText("25%")).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(2600));
-    expect(within(item).getByText("Processing…")).toBeInTheDocument();
-    await act(() => vi.advanceTimersByTimeAsync(2600));
     expect(within(item).getByText("Done")).toBeInTheDocument();
-    expect(media.completeUploadAction).toHaveBeenCalledWith("asset1");
+    // The import finalizes the asset server-side; nothing is polled for processing any more.
+    expect(media.completeUploadAction).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
