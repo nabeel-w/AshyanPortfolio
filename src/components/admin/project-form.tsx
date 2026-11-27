@@ -10,6 +10,7 @@ import type { AssetSummary } from "@/features/media/summary";
 import { deleteProject, saveProject, type ProjectInput } from "@/features/projects/actions";
 import { AssetField, GalleryField } from "./asset-field";
 import { ConfirmButton } from "./confirm-button";
+import { YouTubeFilmField, type YouTubeFilmValue } from "./youtube-film-field";
 import { SchemaForm } from "./schema-form";
 
 const contentFields: FieldDef[] = [
@@ -48,9 +49,12 @@ const seoFields: FieldDef[] = [
   { type: "textarea", name: "seoDescription", label: "Meta description", rows: 2, help: "Optional. Defaults to the summary." },
 ];
 
-export type ProjectFormValue = Omit<ProjectInput, "coverId" | "filmId" | "loopId" | "galleryIds"> & {
+export type ProjectFormValue = Omit<
+  ProjectInput,
+  "coverId" | "loopId" | "galleryIds" | "filmUrl" | "filmOrientation" | "filmAspect" | "filmRuntime"
+> &
+  YouTubeFilmValue & {
   cover: AssetSummary | null;
-  film: AssetSummary | null;
   loop: AssetSummary | null;
   gallery: AssetSummary[];
 };
@@ -64,12 +68,11 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
 
   function save(status?: ProjectFormValue["status"]) {
     startTransition(async () => {
-      const { cover, film, loop, gallery, ...rest } = value;
+      const { cover, loop, gallery, ...rest } = value;
       const res = await saveProject(id, {
         ...rest,
         status: status ?? rest.status,
         coverId: cover?.id ?? null,
-        filmId: film?.id ?? null,
         loopId: loop?.id ?? null,
         galleryIds: gallery.map((g) => g.id),
       });
@@ -150,7 +153,15 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
             errors={errors}
           />
         </section>
-        <aside className="space-y-6">
+        <section aria-label="Film" className="rounded-md border border-border bg-onyx p-5 xl:col-start-1">
+          <YouTubeFilmField
+            value={value}
+            onChange={set}
+            onUseTitle={(title) => set({ title })}
+            errors={errors}
+          />
+        </section>
+        <aside className="space-y-6 xl:col-start-2 xl:row-span-2 xl:row-start-1">
           <section className="space-y-6 rounded-md border border-border bg-onyx p-5">
             <AssetField
               label="Cover (hi-res still)"
@@ -167,7 +178,6 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
               onChange={(loop) => set({ loop })}
               help="3–6 seconds, muted. Plays over the cover on hover (desktop) or when in view (phones)."
             />
-            <AssetField label="Full film" kind="VIDEO" asset={value.film} onChange={(film) => set({ film })} help="Plays on the project page." />
             <GalleryField assets={value.gallery} onChange={(gallery) => set({ gallery })} />
           </section>
           <section className="space-y-5 rounded-md border border-border bg-onyx p-5">

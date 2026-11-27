@@ -26,7 +26,11 @@ const row = {
   publishedAt: new Date("2023-06-01"),
   category: { name: "Fashion" },
   cover: ready(),
-  film: { status: "READY", playbackId: "pb_film", duration: 20.1, url: "https://image.mux.com/pb_film/thumbnail.webp", meta: { aspectRatio: 16 / 9 } },
+  filmUrl: "https://youtu.be/dQw4w9WgXcQ?t=5",
+  filmYoutubeId: "dQw4w9WgXcQ",
+  filmOrientation: "LANDSCAPE",
+  filmAspect: null,
+  filmDuration: 20.1,
   loop: { status: "READY", playbackId: "pb_loop" },
   gallery: [{ asset: ready({ url: "https://cdn/g1.webp" }) }, { asset: ready({ status: "PROCESSING" }) }],
 };
@@ -50,7 +54,17 @@ describe("getProject", () => {
       story: ["First paragraph.", "Second paragraph."],
       credits: [{ role: "Editor", name: "Ashyan Zafar" }],
       cover: { src: "https://cdn/c.webp", alt: "Cover", blurDataUrl: "data:x" },
-      film: { playbackId: "pb_film", duration: 20.1, aspectRatio: 16 / 9 },
+      film: {
+        youtubeId: "dQw4w9WgXcQ",
+        kind: "video",
+        orientation: "landscape",
+        aspect: 16 / 9,
+        duration: 20.1,
+        start: 5,
+        embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        watchUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        poster: { src: "https://cdn/c.webp" },
+      },
       loopPlaybackId: "pb_loop",
       next: { slug: "mumbai", title: "Mumbai" },
     });
@@ -64,9 +78,20 @@ describe("getProject", () => {
     expect(db.project.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: "resonance", status: "PUBLISHED" } }));
   });
 
-  it("hides a film that is still processing", async () => {
-    db.project.findFirst.mockResolvedValue({ ...row, film: { ...row.film, status: "PROCESSING" } });
+  it("has no film without a valid YouTube URL, or when the stored id disagrees with it", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, filmUrl: null });
     expect((await getProject("resonance"))!.film).toBeUndefined();
+    db.project.findFirst.mockResolvedValue({ ...row, filmUrl: "https://youtube.com.evil.io/watch?v=dQw4w9WgXcQ" });
+    expect((await getProject("resonance"))!.film).toBeUndefined();
+    db.project.findFirst.mockResolvedValue({ ...row, filmYoutubeId: "aaaaaaaaaaa" });
+    expect((await getProject("resonance"))!.film).toBeUndefined();
+  });
+
+  it("gives Shorts a portrait 9:16 box, and honours an exact aspect", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, filmUrl: "https://youtube.com/shorts/dQw4w9WgXcQ", filmOrientation: "PORTRAIT" });
+    expect((await getProject("resonance"))!.film).toMatchObject({ kind: "short", orientation: "portrait", aspect: 9 / 16, watchUrl: "https://www.youtube.com/shorts/dQw4w9WgXcQ" });
+    db.project.findFirst.mockResolvedValue({ ...row, filmAspect: 2.39 });
+    expect((await getProject("resonance"))!.film!.aspect).toBe(2.39);
   });
 
   it("tolerates malformed credits JSON", async () => {

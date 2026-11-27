@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ProjectForm } from "@/components/admin/project-form";
+import { clockDuration } from "@/features/media/delivery";
 import { toAssetSummary } from "@/features/media/summary";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
@@ -13,7 +14,6 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
     where: { id },
     include: {
       cover: true,
-      film: true,
       loop: true,
       category: true,
       gallery: { include: { asset: true }, orderBy: { order: "asc" } },
@@ -42,7 +42,10 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
         seoTitle: p.seoTitle ?? "",
         seoDescription: p.seoDescription ?? "",
         cover: p.cover ? toAssetSummary(p.cover) : null,
-        film: p.film ? toAssetSummary(p.film) : null,
+        filmUrl: p.filmUrl ?? "",
+        filmOrientation: p.filmOrientation,
+        filmAspect: p.filmAspect,
+        filmRuntime: p.filmDuration ? clockDuration(p.filmDuration) : "",
         loop: p.loop ? toAssetSummary(p.loop) : null,
         gallery: p.gallery.map((g) => toAssetSummary(g.asset)),
       }}

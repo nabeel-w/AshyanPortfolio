@@ -5,6 +5,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { invalidate } from "@/features/content/invalidate";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
+import { parseRuntime, parseYouTubeUrl, watchUrl } from "@/lib/youtube";
 
 const slugify = (s: string) =>
   s
@@ -40,7 +41,24 @@ const projectInput = z.object({
   order: z.coerce.number().int().min(0).max(9999).default(0),
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
   coverId: optionalId,
-  filmId: optionalId,
+  /** YouTube link (watch, youtu.be, /shorts/…). Validated with the same parser the site uses. */
+  filmUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .nullish()
+    .transform((v) => v || null)
+    .refine((v) => !v || parseYouTubeUrl(v) !== null, "Paste a YouTube link (watch, youtu.be or /shorts/)"),
+  filmOrientation: z.enum(["LANDSCAPE", "PORTRAIT", "SQUARE"]).default("LANDSCAPE"),
+  /** Optional exact width / height, e.g. 2.39 */
+  filmAspect: z.coerce.number().min(0.25).max(4).nullish().catch(null),
+  /** Runtime as typed: "2:41", "1:02:03" or seconds */
+  filmRuntime: z
+    .string()
+    .trim()
+    .max(12)
+    .nullish()
+    .refine((v) => !v || parseRuntime(v) !== null, "Use minutes:seconds, e.g. 2:41"),
   loopId: optionalId,
   galleryIds: z.array(z.string().min(1).max(64)).default([]),
   seoTitle: optionalText(70),
@@ -76,6 +94,7 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
       })
     : null;
 
+  const film = parseYouTubeUrl(input.filmUrl);
   const previous = id ? await db.project.findUnique({ where: { id }, select: { slug: true, status: true, publishedAt: true } }) : null;
   const data = {
     slug,
@@ -96,7 +115,11 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
     seoDescription: input.seoDescription,
     categoryId: category?.id ?? null,
     coverId: input.coverId,
-    filmId: input.filmId,
+    filmUrl: input.filmUrl,
+    filmYoutubeId: film?.id ?? null,
+    filmOrientation: input.filmOrientation,
+    filmAspect: input.filmUrl ? (input.filmAspect ?? null) : null,
+    filmDuration: input.filmUrl ? parseRuntime(input.filmRuntime) : null,
     loopId: input.loopId,
   };
 
@@ -118,4 +141,29 @@ export async function deleteProject(id: string) {
   await requireAdmin();
   const p = await db.project.delete({ where: { id: z.string().min(1).parse(id) } });
   invalidate.projects(p.slug);
+}
+
+export type YouTubeLookup = { ok: true; title: string; author?: string } | { ok: false; error: string };
+
+/**
+ * "Use YouTube title" in the project form: oEmbed gives the public title (and channel). It is only a
+ * prefill. Orientation never comes from here: Shorts report landscape thumbnails (#24).
+ */
+export async function lookupYouTube(url: string): Promise<YouTubeLookup> {
+  await requireAdmin();
+  const parsed = parseYouTubeUrl(z.string().max(2048).parse(url));
+  if (!parsed) return { ok: false, error: "Not a YouTube link" };
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl(parsed.id, parsed.kind))}`,
+      { signal: AbortSignal.timeout(5000), cache: "no-store" },
+    );
+    if (res.status === 401 || res.status === 403) return { ok: false, error: "This video can't be embedded (private, or embedding is off)." };
+    if (!res.ok) return { ok: false, error: `YouTube said ${res.status}. Check the link is public or unlisted.` };
+    const body = (await res.json()) as { title?: unknown; author_name?: unknown };
+    if (typeof body.title !== "string") return { ok: false, error: "YouTube returned no title" };
+    return { ok: true, title: body.title.slice(0, 120), author: typeof body.author_name === "string" ? body.author_name : undefined };
+  } catch {
+    return { ok: false, error: "Couldn't reach YouTube" };
+  }
 }

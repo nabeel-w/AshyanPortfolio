@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FilmPlayer } from "@/components/media/film-player";
+import { YouTubeFilm } from "@/components/media/youtube-film";
 import { getProject, getProjectSlugs, projectMeta } from "@/features/content/projects";
 import { getSite } from "@/features/content/queries";
 import { clockDuration } from "@/features/media/delivery";
@@ -26,6 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/work/[slug]">): P
       url: `/work/${p.slug}`,
       title,
       description,
+      ...(p.film ? { videos: [{ url: p.film.embedUrl, type: "text/html" }] } : {}),
     },
     twitter: { card: "summary_large_image", title, description },
   };
@@ -49,11 +50,13 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
       {/* Film (or still) — full-bleed, capped so the title stays near the fold */}
       <div className="relative">
         {p.film ? (
-          <FilmPlayer
-            playbackId={p.film.playbackId}
+          <YouTubeFilm
+            youtubeId={p.film.youtubeId}
             title={p.title}
             duration={p.film.duration}
-            aspectRatio={p.film.aspectRatio}
+            aspect={p.film.aspect}
+            orientation={p.film.orientation}
+            start={p.film.start}
             poster={p.cover}
             priority
             className="max-h-[82svh]"

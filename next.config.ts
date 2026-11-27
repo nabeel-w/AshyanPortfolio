@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "image.mux.com" },
       { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+      // YouTube thumbnails (admin previews; fallback poster). Films themselves play in the nocookie embed.
+      { protocol: "https", hostname: "i.ytimg.com" },
       { protocol: "https", hostname: "customer-*.cloudflarestream.com" },
       { protocol: "https", hostname: "*.r2.dev" },
       ...(process.env.S3_PUBLIC_URL ? [new URL(process.env.S3_PUBLIC_URL)] : []),

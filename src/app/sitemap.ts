@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getProject } from "@/features/content/projects";
 import { getWorkList } from "@/features/content/queries";
-import { mux } from "@/features/media/delivery";
 import { absoluteUrl } from "@/lib/site-url";
 
 const abs = (src: string) => (src.startsWith("http") ? src : absoluteUrl(src));
@@ -28,7 +27,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
               title: p.title,
               description: p.summary || `${p.title}, edited by Ashyan Zafar.`,
               thumbnail_loc: abs(p.cover.src),
-              content_loc: mux.mp4(p.film.playbackId),
+              // The film lives on YouTube: point at its player, never at a file we don't host.
+              player_loc: p.film.embedUrl,
               duration: p.film.duration ? Math.round(p.film.duration) : undefined,
               publication_date: p.publishedAt?.toISOString(),
             },

@@ -59,6 +59,17 @@ describe("FAQ (GEO)", () => {
   });
 });
 
+const youtubeFilm = {
+  youtubeId: "dQw4w9WgXcQ",
+  kind: "video" as const,
+  orientation: "landscape" as const,
+  aspect: 16 / 9,
+  duration: 20,
+  poster: { src: "/media/x.webp", alt: "" },
+  embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  watchUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+};
+
 describe("ProfilePage + VideoObject", () => {
   it("/about is a ProfilePage about the same #person entity", () => {
     const ld = profilePageJsonLd(site);
@@ -77,13 +88,29 @@ describe("ProfilePage + VideoObject", () => {
         story: [],
         credits: [],
         cover: { src: "/media/x.webp", alt: "" },
-        film: { playbackId: "pb", duration: 20, poster: "" },
+        film: youtubeFilm,
         transcript: "She looks up. Silence.",
         gallery: [],
       },
       site,
     );
     expect(ld["@graph"][0]).toMatchObject({ "@type": ["VideoObject", "CreativeWork"], transcript: "She looks up. Silence.", duration: "PT20S" });
+  });
+
+  it("points the VideoObject at the YouTube player, never at a file we don't host (#25)", () => {
+    const base = { slug: "x", title: "X", format: "Reel", year: 2024, category: "Fashion", summary: "S", story: [], credits: [], cover: { src: "/media/x.webp", alt: "" }, gallery: [] };
+    const work = projectJsonLd({ ...base, film: youtubeFilm }, site)["@graph"][0] as Record<string, unknown>;
+    expect(work).toMatchObject({
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      sameAs: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      thumbnailUrl: ["http://localhost:3000/media/x.webp", "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"],
+      width: 1920,
+      height: 1080,
+    });
+    expect(work).not.toHaveProperty("contentUrl");
+    const reel = projectJsonLd({ ...base, film: { ...youtubeFilm, kind: "short", orientation: "portrait", aspect: 9 / 16 } }, site)["@graph"][0];
+    expect(reel).toMatchObject({ width: 1080, height: 1920 });
+    expect(projectJsonLd(base, site)["@graph"][0]).toMatchObject({ "@type": "CreativeWork" });
   });
 });
 

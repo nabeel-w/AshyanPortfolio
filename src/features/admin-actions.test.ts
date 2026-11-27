@@ -109,6 +109,34 @@ describe("saveProject", () => {
     if (!res.ok) expect(Object.keys(res.errors)).toEqual(expect.arrayContaining(["title", "year"]));
   });
 
+  it("stores a YouTube film: id from the link, orientation, exact aspect and typed runtime (#25)", async () => {
+    await saveProject("p1", {
+      title: "Night Shift",
+      filmUrl: "https://youtube.com/shorts/dQw4w9WgXcQ?feature=share",
+      filmOrientation: "PORTRAIT",
+      filmAspect: 0.5625,
+      filmRuntime: "0:42",
+    });
+    expect(db.project.update.mock.calls.at(-1)![0].data).toMatchObject({
+      filmUrl: "https://youtube.com/shorts/dQw4w9WgXcQ?feature=share",
+      filmYoutubeId: "dQw4w9WgXcQ",
+      filmOrientation: "PORTRAIT",
+      filmAspect: 0.5625,
+      filmDuration: 42,
+    });
+  });
+
+  it("rejects links that aren't YouTube, and bad runtimes, with field errors", async () => {
+    const res = await saveProject("p1", { title: "X", filmUrl: "https://youtube.com.evil.io/watch?v=dQw4w9WgXcQ", filmRuntime: "two mins" });
+    expect(res).toEqual({ ok: false, errors: { filmUrl: expect.stringContaining("YouTube"), filmRuntime: expect.any(String) } });
+    expect(db.project.update).not.toHaveBeenCalled();
+  });
+
+  it("clears the film fields when the link is removed", async () => {
+    await saveProject("p1", { title: "X", filmUrl: "", filmAspect: 2, filmRuntime: "1:00" });
+    expect(db.project.update.mock.calls.at(-1)![0].data).toMatchObject({ filmUrl: null, filmYoutubeId: null, filmAspect: null, filmDuration: null });
+  });
+
   it("deleteProject refreshes the old project page", async () => {
     db.project.delete.mockResolvedValue({ slug: "gone" });
     await deleteProject("p1");

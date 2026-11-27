@@ -14,7 +14,6 @@ export default async function AdminProjectsList() {
       cover: true,
       category: true,
       loop: { select: { id: true } },
-      film: { select: { id: true } },
     },
   });
   return (
@@ -59,7 +58,13 @@ export default async function AdminProjectsList() {
                     </Badge>
                     {p.featured ? <Badge variant="outline">featured</Badge> : null}
                     {p.loop ? <Badge variant="outline">hover loop</Badge> : null}
-                    {p.film ? <Badge variant="outline">film</Badge> : null}
+                    {p.filmYoutubeId ? (
+                      <Badge variant="outline">
+                        YouTube · {p.filmOrientation === "PORTRAIT" ? "Short" : p.filmOrientation === "SQUARE" ? "Square" : "Long"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">no film</Badge>
+                    )}
                   </div>
                 </div>
               </Link>

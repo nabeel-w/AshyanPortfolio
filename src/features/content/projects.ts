@@ -1,13 +1,37 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { z } from "zod";
-import type { Asset } from "@/generated/prisma/client";
+import type { Asset, Project } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import {
+  aspectFor,
+  parseYouTubeUrl,
+  publicEmbedUrl,
+  watchUrl,
+  type VideoOrientation,
+  type YouTubeKind,
+} from "@/lib/youtube";
 import { getWorkList, type WorkItem } from "./queries";
 import { tags } from "./tags";
 
 export type MediaImage = { src: string; alt: string; width?: number; height?: number; blurDataUrl?: string };
-export type Film = { playbackId: string; duration?: number; aspectRatio?: number; poster: string };
+/** A project's film: always a YouTube video behind the click-to-play facade (#24, #25). */
+export type Film = {
+  youtubeId: string;
+  kind: YouTubeKind;
+  orientation: VideoOrientation;
+  /** width / height of the player box */
+  aspect: number;
+  /** Seconds (typed by the admin; oEmbed has no duration) */
+  duration?: number;
+  start?: number;
+  /** The project cover (LCP image), not the YouTube thumbnail */
+  poster: MediaImage;
+  /** https://www.youtube.com/embed/<id> — for VideoObject / the video sitemap */
+  embedUrl: string;
+  /** Public watch / shorts link */
+  watchUrl: string;
+};
 
 export type ProjectDetail = {
   slug: string;
@@ -55,10 +79,31 @@ const image = (a: Asset | null | undefined): MediaImage | undefined =>
       }
     : undefined;
 
-function film(a: Asset | null | undefined): Film | undefined {
-  if (a?.status !== "READY" || !a.playbackId) return undefined;
-  const meta = (a.meta ?? {}) as { aspectRatio?: number };
-  return { playbackId: a.playbackId, duration: a.duration ?? undefined, aspectRatio: meta.aspectRatio, poster: a.url ?? "" };
+export const orientationOf = (o: "LANDSCAPE" | "PORTRAIT" | "SQUARE" | null | undefined): VideoOrientation =>
+  o === "PORTRAIT" ? "portrait" : o === "SQUARE" ? "square" : "landscape";
+
+type FilmColumns = Pick<
+  Project,
+  "filmUrl" | "filmYoutubeId" | "filmOrientation" | "filmAspect" | "filmDuration"
+>;
+
+/** The film from the project's YouTube columns (re-parsed, so a bad stored URL never reaches the page). */
+export function filmOf(p: FilmColumns, poster: MediaImage): Film | undefined {
+  const parsed = parseYouTubeUrl(p.filmUrl);
+  const id = parsed?.id ?? undefined;
+  if (!id || (p.filmYoutubeId && p.filmYoutubeId !== id)) return undefined;
+  const orientation = orientationOf(p.filmOrientation);
+  return {
+    youtubeId: id,
+    kind: parsed!.kind,
+    orientation,
+    aspect: aspectFor(orientation, p.filmAspect),
+    duration: p.filmDuration ?? undefined,
+    start: parsed!.start,
+    poster,
+    embedUrl: publicEmbedUrl(id),
+    watchUrl: watchUrl(id, parsed!.kind),
+  };
 }
 
 const paragraphs = (text?: string | null) =>
@@ -87,7 +132,6 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     include: {
       category: true,
       cover: true,
-      film: true,
       loop: true,
       gallery: { include: { asset: true }, orderBy: { order: "asc" } },
     },
@@ -119,7 +163,7 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     transcript: p.transcript?.trim() || undefined,
     credits: creditsSchema.parse(p.credits ?? []),
     cover,
-    film: film(p.film),
+    film: filmOf(p, cover),
     loopPlaybackId: p.loop?.status === "READY" ? (p.loop.playbackId ?? undefined) : undefined,
     gallery: p.gallery.flatMap((g) => image(g.asset) ?? []),
     seoTitle: p.seoTitle?.trim() || undefined,

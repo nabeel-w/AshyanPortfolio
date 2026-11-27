@@ -26,7 +26,10 @@ export default async function NewProjectPage() {
         seoTitle: "",
         seoDescription: "",
         cover: null,
-        film: null,
+        filmUrl: "",
+        filmOrientation: "LANDSCAPE",
+        filmAspect: null,
+        filmRuntime: "",
         loop: null,
         gallery: [],
       }}

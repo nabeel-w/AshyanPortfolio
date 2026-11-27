@@ -1,7 +1,8 @@
 import type { Person, WebSite, WithContext } from "schema-dts";
 import type { ProjectDetail } from "@/features/content/projects";
 import type { Site } from "@/features/content/queries";
-import { isoDuration, mux } from "@/features/media/delivery";
+import { isoDuration } from "@/features/media/delivery";
+import { thumbnailUrl } from "@/lib/youtube";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
@@ -51,6 +52,13 @@ export function personJsonLd(site: Site): WithContext<Person> {
   };
 }
 
+/** Nominal pixel size for VideoObject: 1080 on the short edge, the long edge from the aspect. */
+export function filmSize(aspect: number) {
+  return aspect >= 1
+    ? { width: Math.round(1080 * aspect), height: 1080 }
+    : { width: 1080, height: Math.round(1080 / aspect) };
+}
+
 /**
  * Project page graph: the film as a VideoObject (when there is one) that is also the CreativeWork,
  * credited to #person, plus a BreadcrumbList. Text fields mirror the visible page (no hidden claims).
@@ -78,11 +86,13 @@ export function projectJsonLd(p: ProjectDetail, site: Site) {
       .map((c) => ({ "@type": "Person", name: c.name, jobTitle: c.role })),
     ...(p.film
       ? {
-          thumbnailUrl: [image, mux.poster(p.film.playbackId, 1)],
+          thumbnailUrl: [image, thumbnailUrl(p.film.youtubeId)],
           uploadDate: (p.publishedAt ?? new Date(Date.UTC(p.year, 0, 1))).toISOString(),
           duration: p.film.duration ? isoDuration(p.film.duration) : undefined,
-          contentUrl: mux.mp4(p.film.playbackId),
-          embedUrl: url,
+          // No contentUrl: the file is YouTube's, not ours. embedUrl is the player Google can index.
+          embedUrl: p.film.embedUrl,
+          sameAs: p.film.watchUrl,
+          ...filmSize(p.film.aspect),
           transcript: p.transcript || undefined,
         }
       : {}),
