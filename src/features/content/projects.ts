@@ -26,10 +26,21 @@ export type ProjectDetail = {
   film?: Film;
   loopPlaybackId?: string;
   gallery: MediaImage[];
+  /** Admin overrides for <title> / meta description (fall back to title — format / summary). */
+  seoTitle?: string;
+  seoDescription?: string;
   publishedAt?: Date;
   updatedAt?: Date;
   next?: { slug: string; title: string; cover: MediaImage };
 };
+
+/** <title> and meta description: the admin SEO fields win, then "Title — Format" and the summary. */
+export function projectMeta(p: Pick<ProjectDetail, "title" | "format" | "summary" | "seoTitle" | "seoDescription">) {
+  return {
+    title: p.seoTitle || `${p.title} — ${p.format}`,
+    description: p.seoDescription || p.summary || `${p.title}, a ${p.format.toLowerCase()} edited by Ashyan Zafar.`,
+  };
+}
 
 const creditsSchema = z.array(z.object({ role: z.string(), name: z.string() })).catch([]);
 
@@ -111,6 +122,8 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     film: film(p.film),
     loopPlaybackId: p.loop?.status === "READY" ? (p.loop.playbackId ?? undefined) : undefined,
     gallery: p.gallery.flatMap((g) => image(g.asset) ?? []),
+    seoTitle: p.seoTitle?.trim() || undefined,
+    seoDescription: p.seoDescription?.trim() || undefined,
     publishedAt: p.publishedAt ?? undefined,
     updatedAt: p.updatedAt,
     next: nextRow && nextCover ? { slug: nextRow.slug, title: nextRow.title, cover: nextCover } : undefined,

@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FilmPlayer } from "@/components/media/film-player";
-import { getProject, getProjectSlugs } from "@/features/content/projects";
+import { getProject, getProjectSlugs, projectMeta } from "@/features/content/projects";
 import { getSite } from "@/features/content/queries";
 import { clockDuration } from "@/features/media/delivery";
 import { JsonLd, projectJsonLd } from "@/features/seo/json-ld";
@@ -16,8 +16,7 @@ export async function generateMetadata({ params }: PageProps<"/work/[slug]">): P
   const { slug } = await params;
   const p = await getProject(slug);
   if (!p) return {};
-  const title = `${p.title} — ${p.format}`;
-  const description = p.summary || `${p.title}, a ${p.format.toLowerCase()} edited by Ashyan Zafar.`;
+  const { title, description } = projectMeta(p);
   return {
     title,
     description,

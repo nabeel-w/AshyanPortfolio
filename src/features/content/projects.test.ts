@@ -7,7 +7,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ db }));
 
-const { getProject, getProjectSlugs } = await import("./projects");
+const { getProject, getProjectSlugs, projectMeta } = await import("./projects");
 
 const ready = (over: object = {}) => ({ status: "READY", url: "https://cdn/c.webp", alt: "Cover", width: 1600, height: 900, blurDataUrl: "data:x", ...over });
 
@@ -84,6 +84,22 @@ describe("getProject", () => {
     db.project.findMany.mockResolvedValue([]);
     expect(await getProject("the-next-chapter")).toMatchObject({ slug: "the-next-chapter", title: "The Next Chapter" });
     expect(await getProject("does-not-exist")).toBeNull();
+  });
+});
+
+describe("project SEO fields (#31)", () => {
+  it("carries the admin SEO title and description", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, seoTitle: " Résonance, a fashion film ", seoDescription: "Custom description." });
+    const p = (await getProject("resonance"))!;
+    expect(p).toMatchObject({ seoTitle: "Résonance, a fashion film", seoDescription: "Custom description." });
+    expect(projectMeta(p)).toEqual({ title: "Résonance, a fashion film", description: "Custom description." });
+  });
+
+  it("falls back to Title — Format and the summary when the fields are empty", async () => {
+    db.project.findFirst.mockResolvedValue({ ...row, seoTitle: "", seoDescription: null });
+    const p = (await getProject("resonance"))!;
+    expect(projectMeta(p)).toEqual({ title: "Résonance — Fashion Film", description: "Short summary." });
+    expect(projectMeta({ ...p, summary: "" }).description).toBe("Résonance, a fashion film edited by Ashyan Zafar.");
   });
 });
 
