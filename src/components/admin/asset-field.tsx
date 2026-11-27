@@ -4,7 +4,20 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { AssetSummary } from "@/features/media/summary";
 import { clockDuration } from "@/features/media/delivery";
-import { assetThumb, MediaPicker } from "./media-picker";
+import { AssetThumb, MediaPicker } from "./media-picker";
+
+/** Soft limits for hover loops: warn, never block (#26). */
+const LOOP_WARN_SECONDS = 8;
+const LOOP_WARN_BYTES = 8 * 1024 * 1024;
+
+export function loopWarnings(asset: Pick<AssetSummary, "duration" | "bytes" | "width" | "height"> | null): string[] {
+  if (!asset) return [];
+  const out: string[] = [];
+  if (asset.duration && asset.duration > LOOP_WARN_SECONDS) out.push(`It runs ${Math.round(asset.duration)} s; loops read best at 3–6 s.`);
+  if (asset.bytes && asset.bytes > LOOP_WARN_BYTES) out.push(`It is ${(asset.bytes / 1024 / 1024).toFixed(1)} MB; aim for 2–4 MB so it starts instantly.`);
+  if (asset.width && asset.height && Math.max(asset.width, asset.height) > 1280) out.push(`It is ${asset.width}×${asset.height}; 720p (1280 px long edge) is plenty.`);
+  return out;
+}
 
 /** Pick one library asset by id (project cover / film / loop). */
 export function AssetField({
@@ -14,6 +27,7 @@ export function AssetField({
   asset,
   onChange,
   error,
+  purpose,
 }: {
   label: string;
   help?: string;
@@ -21,8 +35,10 @@ export function AssetField({
   asset: AssetSummary | null;
   onChange: (asset: AssetSummary | null) => void;
   error?: string;
+  purpose?: "loop";
 }) {
   const [open, setOpen] = useState(false);
+  const warnings = purpose === "loop" ? loopWarnings(asset) : [];
   return (
     <div>
       <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
@@ -34,8 +50,7 @@ export function AssetField({
           className="relative grid aspect-video w-44 shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-graphite hover:border-red"
         >
           {asset ? (
-            // eslint-disable-next-line @next/next/no-img-element -- admin preview, any provider host
-            <img src={assetThumb(asset)} alt="" className="absolute inset-0 size-full object-cover" />
+            <AssetThumb asset={asset} className="absolute inset-0 size-full object-cover" />
           ) : (
             <span className="text-xs text-muted-foreground">Choose…</span>
           )}
@@ -60,8 +75,13 @@ export function AssetField({
         </div>
       </div>
       {help ? <p className="mt-1.5 text-xs text-muted-foreground">{help}</p> : null}
+      {warnings.map((w) => (
+        <p key={w} className="mt-1.5 text-xs text-amber-300">
+          ⚠ {w}
+        </p>
+      ))}
       {error ? <p className="mt-1.5 text-xs text-red-bright">{error}</p> : null}
-      <MediaPicker open={open} onOpenChange={setOpen} kind={kind} onPick={onChange} />
+      <MediaPicker open={open} onOpenChange={setOpen} kind={kind} onPick={onChange} purpose={purpose} />
     </div>
   );
 }
@@ -82,8 +102,7 @@ export function GalleryField({ assets, onChange }: { assets: AssetSummary[]; onC
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {assets.map((a, i) => (
           <li key={`${a.id}-${i}`} className="overflow-hidden rounded-md border border-border">
-            {/* eslint-disable-next-line @next/next/no-img-element -- admin preview */}
-            <img src={assetThumb(a)} alt="" className="aspect-video w-full object-cover" />
+            <AssetThumb asset={a} className="aspect-video w-full object-cover" />
             <div className="flex justify-between px-1">
               <Button type="button" size="icon-xs" variant="ghost" aria-label="Move left" onClick={() => move(i, i - 1)}>
                 ←

@@ -14,6 +14,13 @@ export const mediaRef = z.object({
   blurDataUrl: z.string().optional(),
 });
 
+/** A hover loop: a short MP4/WebM URL plus its size (portrait loops fill tall tiles). */
+export const loopRef = z.object({
+  src: z.string(),
+  width: z.number().int().optional(),
+  height: z.number().int().optional(),
+});
+
 const link = z.object({ label: z.string(), href: z.string() });
 
 export const heroSchema = z.object({
@@ -45,7 +52,8 @@ export const workGridSchema = z.object({
         year: z.number().int(),
         category: z.string(),
         cover: mediaRef,
-        loopPlaybackId: z.string().optional(),
+        /** Short muted hover loop on Vercel Blob (#26) */
+        loop: loopRef.optional(),
       }),
     )
     .default([]),

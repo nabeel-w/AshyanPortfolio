@@ -137,7 +137,7 @@ function DeviceTab({
     >
       <p className="font-serif text-2xl text-ivory">Drop stills, films or PDFs here</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Images go to the image store, video to the video host. Videos take a minute to process.
+        Stills, logos and hover loops are stored on Vercel Blob. Films are YouTube links, set on each project.
       </p>
       <input
         ref={input}

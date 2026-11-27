@@ -5,14 +5,39 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { listAssetsAction } from "@/features/media/actions";
 import type { AssetSummary } from "@/features/media/summary";
-import { mux } from "@/features/media/delivery";
 import { cn } from "@/lib/utils";
 import { UploadDialog } from "./upload/upload-dialog";
 import { useUploadQueue } from "./upload/use-upload-queue";
 
-export function assetThumb(a: Pick<AssetSummary, "kind" | "url" | "playbackId">) {
-  if (a.kind === "VIDEO" && a.playbackId) return mux.poster(a.playbackId, 1, 480);
-  return a.url ?? "";
+/**
+ * Library thumbnail for any asset. Blob videos have no poster image, so a video shows its own first
+ * frame (metadata-only load, ~ the first few hundred KB). Images are a plain lazy <img>.
+ */
+export function AssetThumb({
+  asset,
+  className,
+  alt = "",
+}: {
+  asset: Pick<AssetSummary, "kind" | "url">;
+  className?: string;
+  alt?: string;
+}) {
+  if (!asset.url) return <span className={cn("block bg-graphite", className)} />;
+  if (asset.kind === "VIDEO") {
+    return (
+      <video
+        src={`${asset.url}#t=0.5`}
+        preload="metadata"
+        muted
+        playsInline
+        aria-hidden
+        tabIndex={-1}
+        className={cn("pointer-events-none", className)}
+      />
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element -- admin thumbnails, any storage host
+  return <img src={asset.url} alt={alt} loading="lazy" className={className} />;
 }
 
 /**
@@ -26,12 +51,15 @@ export function MediaPicker({
   kind,
   onPick,
   title,
+  purpose,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   kind: "IMAGE" | "VIDEO";
   onPick: (asset: AssetSummary) => void;
   title?: string;
+  /** "loop": only small MP4/WebM uploads (and Drive picks) are allowed */
+  purpose?: "loop";
 }) {
   const [assets, setAssets] = useState<AssetSummary[] | null>(null);
   const [query, setQuery] = useState("");
@@ -42,7 +70,7 @@ export function MediaPicker({
     () => startTransition(async () => setAssets(await listAssetsAction({ kind, readyOnly: true }))),
     [kind],
   );
-  const queue = useUploadQueue({ onChange: load });
+  const queue = useUploadQueue({ onChange: load, purpose });
 
   useEffect(() => {
     if (open) load();
@@ -78,7 +106,7 @@ export function MediaPicker({
               <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
             ) : shown.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
-                Nothing ready yet. Upload one; videos appear here once processed.
+                Nothing here yet. Upload one to use it.
               </p>
             ) : (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -95,13 +123,7 @@ export function MediaPicker({
                       )}
                     >
                       <span className="relative block aspect-video bg-graphite">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- admin thumbnails, any provider host */}
-                        <img
-                          src={assetThumb(a)}
-                          alt={a.alt}
-                          loading="lazy"
-                          className="size-full object-cover"
-                        />
+                        <AssetThumb asset={a} alt={a.alt} className="size-full object-cover" />
                       </span>
                       <span className="block truncate px-2 py-1.5 text-xs text-muted-foreground">
                         {a.filename}
@@ -118,8 +140,8 @@ export function MediaPicker({
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         queue={queue}
-        accept={kind === "VIDEO" ? "video/*" : "image/*"}
-        title={kind === "VIDEO" ? "Add a video" : "Add an image"}
+        accept={purpose === "loop" ? "video/mp4,video/webm" : kind === "VIDEO" ? "video/*" : "image/*"}
+        title={purpose === "loop" ? "Add a hover loop" : kind === "VIDEO" ? "Add a video" : "Add an image"}
       />
     </>
   );

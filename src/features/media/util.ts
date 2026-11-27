@@ -15,6 +15,15 @@ export function maxBytes(kind: MediaKind): number {
   return mb * 1024 * 1024;
 }
 
+/** Hover loops: short muted MP4/WebM clips on the grid (#26). Override the cap with MEDIA_MAX_LOOP_MB. */
+export const LOOP_MIME_TYPES = ["video/mp4", "video/webm"] as const;
+export function maxLoopBytes(): number {
+  return Number(process.env.MEDIA_MAX_LOOP_MB || 20) * 1024 * 1024;
+}
+
+/** Why a file is being added; it tightens the rules (a loop must be a small MP4/WebM). */
+export type UploadPurpose = "loop";
+
 /** "image/2026/11/hero-still-k3j2x9.webp" — readable, unique, URL-safe. */
 export function makeKey(kind: MediaKind, filename: string, now = new Date()): string {
   const dot = filename.lastIndexOf(".");

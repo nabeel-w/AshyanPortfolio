@@ -153,7 +153,7 @@ describe("getPublishedPage", () => {
           height: 900,
           blurDataUrl: "data:x",
         },
-        loop: { playbackId: "pb_loop", status: "READY" },
+        loop: { status: "READY", kind: "VIDEO", url: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 720, height: 1280 },
       },
     ]);
     const [section] = await getPublishedPage("home");
@@ -172,7 +172,7 @@ describe("getPublishedPage", () => {
           height: 900,
           blurDataUrl: "data:x",
         },
-        loopPlaybackId: "pb_loop",
+        loop: { src: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 720, height: 1280 },
       },
     ]);
   });
@@ -184,11 +184,22 @@ describe("getPublishedPage", () => {
         title: "P",
         createdAt: new Date("2026-01-01"),
         cover: { url: "https://cdn/p.webp", alt: "" },
-        loop: { playbackId: "pb", status: "PROCESSING" },
+        loop: { url: "https://x.public.blob.vercel-storage.com/l.mp4", status: "PROCESSING" },
       },
     ]);
     const [item] = await getPublishedProjects();
-    expect(item!.loopPlaybackId).toBeUndefined();
+    expect(item!.loop).toBeUndefined();
+  });
+
+  it("uses a Blob video picked as a loop (no playback id needed), but never an image", async () => {
+    const base = { slug: "p", title: "P", createdAt: new Date("2026-01-01"), cover: { url: "https://cdn/p.webp", alt: "" } };
+    db.project.findMany.mockResolvedValue([
+      { ...base, loop: { url: "https://x.public.blob.vercel-storage.com/l.mp4", status: "READY", kind: "VIDEO", width: null, height: null } },
+      { ...base, slug: "q", loop: { url: "https://cdn/still.webp", status: "READY", kind: "IMAGE" } },
+    ]);
+    const [blob, image] = await getPublishedProjects();
+    expect(blob!.loop).toEqual({ src: "https://x.public.blob.vercel-storage.com/l.mp4" });
+    expect(image!.loop).toBeUndefined();
   });
 
   it("hydrates the marquee from client rows", async () => {

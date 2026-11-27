@@ -9,11 +9,15 @@ import type { UploadInstruction } from "../types";
  *   const asset = await uploadFile(file, { onProgress: (p) => setProgress(p) })
  * Bytes go straight from the browser to the provider; our server only signs and records.
  */
-export async function uploadFile(file: File, opts: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {}) {
+export async function uploadFile(
+  file: File,
+  opts: { onProgress?: (fraction: number) => void; signal?: AbortSignal; purpose?: "loop" } = {},
+) {
   const ticket = await createUploadAction({
     filename: file.name,
     mimeType: file.type || "application/octet-stream",
     bytes: file.size,
+    ...(opts.purpose ? { purpose: opts.purpose } : {}),
   });
   // Read the video's shape while it uploads: Blob stores no width/height/duration for videos (#24).
   const probe = file.type.startsWith("video/") ? probeVideo(file) : Promise.resolve(undefined);

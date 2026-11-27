@@ -65,6 +65,25 @@ describe("createUpload", () => {
     ).rejects.toThrow();
   });
 
+  it("holds hover loops to small MP4/WebM files (#26)", async () => {
+    vi.stubEnv("MEDIA_MAX_LOOP_MB", "5");
+    await expect(
+      createUpload({ filename: "loop.mov", mimeType: "video/quicktime", bytes: 1000, purpose: "loop" }),
+    ).rejects.toThrow("must be an MP4 (H.264) or WebM file");
+    await expect(
+      createUpload({ filename: "loop.mp4", mimeType: "video/mp4", bytes: 6 * 1024 * 1024, purpose: "loop" }),
+    ).rejects.toThrow(/under 5 MB/);
+    await expect(
+      createUpload({ filename: "still.webp", mimeType: "image/webp", bytes: 100, purpose: "loop" }),
+    ).rejects.toThrow(/MP4/);
+    expect(provider.createUpload).not.toHaveBeenCalled();
+    provider.createUpload.mockResolvedValue({ providerKey: "pk", upload: { strategy: "put", url: "https://up" } });
+    db.asset.create.mockResolvedValue({ id: "asset_1" });
+    await expect(
+      createUpload({ filename: "loop.webm", mimeType: "video/webm", bytes: 3 * 1024 * 1024, purpose: "loop" }),
+    ).resolves.toMatchObject({ kind: "VIDEO" });
+  });
+
   it("asks the provider for an upload instruction and records an UPLOADING asset", async () => {
     provider.createUpload.mockResolvedValue({
       providerKey: "pk_1",

@@ -17,7 +17,7 @@ import { clockDuration } from "@/features/media/delivery";
 import type { AssetSummary } from "@/features/media/summary";
 import { cn } from "@/lib/utils";
 import { ConfirmButton } from "./confirm-button";
-import { assetThumb } from "./media-picker";
+import { AssetThumb } from "./media-picker";
 import { UploadDialog } from "./upload/upload-dialog";
 import { useUploadQueue } from "./upload/use-upload-queue";
 
@@ -115,13 +115,7 @@ export function MediaLibrary({
               >
                 <span className="relative block aspect-video bg-graphite">
                   {a.status === "READY" ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- admin thumbnail, any provider host
-                    <img
-                      src={assetThumb(a)}
-                      alt={a.alt}
-                      loading="lazy"
-                      className="size-full object-cover"
-                    />
+                    <AssetThumb asset={a} alt={a.alt} className="size-full object-cover" />
                   ) : (
                     <TileStatus asset={a} />
                   )}
@@ -212,8 +206,7 @@ function AssetPanel({
   return (
     <div className="space-y-4 rounded-md border border-border bg-onyx p-4">
       {asset.status === "READY" ? (
-        // eslint-disable-next-line @next/next/no-img-element -- admin preview
-        <img src={assetThumb(asset)} alt="" className="aspect-video w-full rounded object-cover" />
+        <AssetThumb asset={asset} className="aspect-video w-full rounded object-cover" />
       ) : (
         <div className="aspect-video w-full overflow-hidden rounded bg-graphite">
           <TileStatus asset={asset} />

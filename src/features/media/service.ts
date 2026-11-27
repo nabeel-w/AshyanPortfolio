@@ -5,7 +5,15 @@ import { getProvider, providerFor } from "./providers";
 import type { MediaKind, ProviderResult, StorageProvider, UploadInstruction } from "./types";
 import { analyzeImage } from "./image-meta";
 import type { MediaProbe } from "./probe";
-import { expectOk, kindFromMime, makeKey, maxBytes } from "./util";
+import {
+  expectOk,
+  kindFromMime,
+  LOOP_MIME_TYPES,
+  makeKey,
+  maxBytes,
+  maxLoopBytes,
+  type UploadPurpose,
+} from "./util";
 
 /**
  * The upload pipeline, provider-agnostic. Auth is NOT checked here — callers are
@@ -15,7 +23,7 @@ import { expectOk, kindFromMime, makeKey, maxBytes } from "./util";
  *   (streaming video may stay PROCESSING until the provider's webhook calls applyWebhook)
  */
 
-export type UploadRequest = { filename: string; mimeType: string; bytes: number };
+export type UploadRequest = { filename: string; mimeType: string; bytes: number; purpose?: UploadPurpose };
 export type UploadTicket = {
   assetId: string;
   kind: MediaKind;
@@ -24,9 +32,18 @@ export type UploadTicket = {
 };
 
 /** Same type + size rules for every way a file gets in (browser upload, Drive import). */
-export function validateUpload(mimeType: string, bytes: number): MediaKind {
+export function validateUpload(mimeType: string, bytes: number, purpose?: UploadPurpose): MediaKind {
   const kind = kindFromMime(mimeType);
   if (!kind) throw new Error(`Unsupported file type: ${mimeType || "unknown"}`);
+  if (purpose === "loop") {
+    if (!(LOOP_MIME_TYPES as readonly string[]).includes(mimeType)) {
+      throw new Error("A hover loop must be an MP4 (H.264) or WebM file.");
+    }
+    if (bytes <= 0 || bytes > maxLoopBytes()) {
+      throw new Error(`Hover loops must be under ${Math.round(maxLoopBytes() / 1024 / 1024)} MB (aim for 2–4 MB).`);
+    }
+    return kind;
+  }
   if (bytes <= 0 || bytes > maxBytes(kind)) {
     throw new Error(
       `${kind.toLowerCase()} files must be under ${Math.round(maxBytes(kind) / 1024 / 1024)} MB`,
@@ -39,8 +56,9 @@ export async function createUpload({
   filename,
   mimeType,
   bytes,
+  purpose,
 }: UploadRequest): Promise<UploadTicket> {
-  const kind = validateUpload(mimeType, bytes);
+  const kind = validateUpload(mimeType, bytes, purpose);
   const provider = providerFor(kind);
   const key = makeKey(kind, filename);
   const { providerKey, upload } = await provider.createUpload({
@@ -135,12 +153,13 @@ export async function applyWebhook(providerId: string, request: Request) {
  */
 export async function ingest(
   file: Buffer,
-  meta: { filename: string; mimeType: string; alt?: string },
+  meta: { filename: string; mimeType: string; alt?: string; purpose?: UploadPurpose; probe?: MediaProbe },
 ) {
   const ticket = await createUpload({
     filename: meta.filename,
     mimeType: meta.mimeType,
     bytes: file.length,
+    purpose: meta.purpose,
   });
   const body = new Uint8Array(file);
   const { upload } = ticket;
@@ -169,7 +188,7 @@ export async function ingest(
     });
   }
   if (meta.alt) await db.asset.update({ where: { id: ticket.assetId }, data: { alt: meta.alt } });
-  return completeUpload(ticket.assetId);
+  return completeUpload(ticket.assetId, meta.probe);
 }
 
 /** Remove from the provider first, then the DB row (relations are SetNull / Cascade in the schema). */

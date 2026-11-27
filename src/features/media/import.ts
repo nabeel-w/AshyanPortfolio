@@ -5,6 +5,7 @@ import { tags } from "@/features/content/tags";
 import { driveFileMeta, driveReadRange } from "@/features/google/drive";
 import { db } from "@/lib/db";
 import { cleanProbe } from "./probe";
+import type { UploadPurpose } from "./util";
 import { completeUpload, validateUpload } from "./service";
 import { getProvider, providerFor } from "./providers";
 import {
@@ -43,9 +44,9 @@ export type ImportSource = "google-drive";
 // ─── Creating ────────────────────────────────────────────────────────────────
 
 /** Validate a picked Drive file and start importing it. Returns the new asset id. */
-export async function createDriveImport(accountId: string, fileId: string): Promise<string> {
+export async function createDriveImport(accountId: string, fileId: string, purpose?: UploadPurpose): Promise<string> {
   const file = await driveFileMeta(accountId, fileId);
-  const kind = validateUpload(file.mimeType, file.size);
+  const kind = validateUpload(file.mimeType, file.size, purpose);
   const provider = providerFor(kind);
   if (!provider.importer) {
     throw new Error(

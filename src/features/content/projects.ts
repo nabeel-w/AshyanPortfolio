@@ -11,7 +11,7 @@ import {
   type VideoOrientation,
   type YouTubeKind,
 } from "@/lib/youtube";
-import { getWorkList, type WorkItem } from "./queries";
+import { getWorkList, loopOf, type LoopRef, type WorkItem } from "./queries";
 import { tags } from "./tags";
 
 export type MediaImage = { src: string; alt: string; width?: number; height?: number; blurDataUrl?: string };
@@ -48,7 +48,8 @@ export type ProjectDetail = {
   credits: { role: string; name: string }[];
   cover: MediaImage;
   film?: Film;
-  loopPlaybackId?: string;
+  /** Hover loop (Blob); the page itself doesn't play it, but share cards / related tiles can */
+  loop?: LoopRef;
   gallery: MediaImage[];
   /** Admin overrides for <title> / meta description (fall back to title — format / summary). */
   seoTitle?: string;
@@ -164,7 +165,7 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
     credits: creditsSchema.parse(p.credits ?? []),
     cover,
     film: filmOf(p, cover),
-    loopPlaybackId: p.loop?.status === "READY" ? (p.loop.playbackId ?? undefined) : undefined,
+    loop: loopOf(p.loop),
     gallery: p.gallery.flatMap((g) => image(g.asset) ?? []),
     seoTitle: p.seoTitle?.trim() || undefined,
     seoDescription: p.seoDescription?.trim() || undefined,

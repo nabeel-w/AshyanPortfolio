@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { mux } from "@/features/media/delivery";
 import { cn } from "@/lib/utils";
 
 /** Only one loop plays at a time across the page. */
@@ -13,13 +12,14 @@ function claim(video: HTMLVideoElement) {
 }
 
 /**
- * Muted preview loop layered over a poster image (the poster stays the LCP element).
+ * Muted preview loop (a short MP4/WebM on Vercel Blob) layered over a poster image; the poster stays
+ * the LCP element. Portrait loops fill tall bento tiles with object-cover, so no letterboxing.
  * - Bytes load only when the card is near the viewport (preload="none" until then).
  * - Desktop (hover-capable): plays while the surrounding card is hovered or focused.
  * - Touch: plays while ≥ 60% visible.
  * - Never plays for reduced-motion or Save-Data users.
  */
-export function VideoLoop({ playbackId, className }: { playbackId: string; className?: string }) {
+export function VideoLoop({ src: loopSrc, poster, className }: { src: string; poster?: string; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -33,7 +33,7 @@ export function VideoLoop({ playbackId, className }: { playbackId: string; class
     const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
     const scope = video.closest<HTMLElement>("a, [data-loop-scope]") ?? video.parentElement!;
     const start = () => {
-      setSrc((s) => s ?? mux.mp4(playbackId));
+      setSrc((s) => s ?? loopSrc);
       claim(video);
       void video.play().catch(() => {});
     };
@@ -45,7 +45,7 @@ export function VideoLoop({ playbackId, className }: { playbackId: string; class
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return;
-        if (entry.isIntersecting) setSrc((s) => s ?? mux.mp4(playbackId));
+        if (entry.isIntersecting) setSrc((s) => s ?? loopSrc);
         if (!hoverCapable) {
           if (entry.intersectionRatio >= 0.6) start();
           else stop();
@@ -69,7 +69,7 @@ export function VideoLoop({ playbackId, className }: { playbackId: string; class
       scope.removeEventListener("focusout", stop);
       if (active === video) active = null;
     };
-  }, [playbackId]);
+  }, [loopSrc]);
 
   return (
     <video
@@ -79,6 +79,7 @@ export function VideoLoop({ playbackId, className }: { playbackId: string; class
       loop
       playsInline
       preload="none"
+      poster={poster}
       aria-hidden
       tabIndex={-1}
       onPlaying={() => setPlaying(true)}

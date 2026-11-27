@@ -174,9 +174,10 @@ export function ProjectForm({ id, initial }: { id: string | null; initial: Proje
             <AssetField
               label="Hover preview (short loop)"
               kind="VIDEO"
+              purpose="loop"
               asset={value.loop}
               onChange={(loop) => set({ loop })}
-              help="3–6 seconds, muted. Plays over the cover on hover (desktop) or when in view (phones)."
+              help="Loop: 3–6 s, muted, H.264 MP4 (or WebM), ≤ 720p (≤ 1280 px long edge), ~2–4 MB. Shoot reels’ loops in 9:16. Plays over the cover on hover (desktop) or while in view (phones)."
             />
             <GalleryField assets={value.gallery} onChange={(gallery) => set({ gallery })} />
           </section>

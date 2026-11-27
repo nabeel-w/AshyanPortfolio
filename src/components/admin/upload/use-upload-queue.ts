@@ -33,13 +33,13 @@ const message = (e: unknown) => (e instanceof Error ? e.message : "Upload failed
 
 /**
  * Everything being added to the library, whatever the source. Device files upload from the browser
- * straight to the provider; Drive files transfer server-side and are polled for progress; both then
- * wait for the provider to finish processing (e.g. Mux transcoding). Lives in the page, not the
+ * straight to the provider; Drive files transfer server-side and are polled for progress until the
+ * provider reports the file READY. Lives in the page, not the
  * dialog, so closing the dialog doesn't stop anything.
  *
  * `onChange` fires when an item changes state (created, done, failed), so callers can refresh lists.
  */
-export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
+export function useUploadQueue({ onChange, purpose }: { onChange?: () => void; purpose?: "loop" } = {}) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const files = useRef(new Map<string, File>());
   const changed = useRef(onChange);
@@ -57,6 +57,7 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
       try {
         const asset = await uploadFile(file, {
           onProgress: (progress) => patch(key, { progress }),
+          ...(purpose ? { purpose } : {}),
         });
         patch(key, {
           assetId: asset.id,
@@ -73,7 +74,7 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
       }
       changed.current?.();
     },
-    [patch],
+    [patch, purpose],
   );
 
   const addFiles = useCallback(
@@ -105,7 +106,9 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
         })),
       ]);
       try {
-        const results = await importFromDriveAction(rows.map((r) => r.id));
+        const results = purpose
+          ? await importFromDriveAction(rows.map((r) => r.id), purpose)
+          : await importFromDriveAction(rows.map((r) => r.id));
         for (const r of rows) {
           const res = results.find((x) => x.fileId === r.id);
           patch(
@@ -120,7 +123,7 @@ export function useUploadQueue({ onChange }: { onChange?: () => void } = {}) {
       }
       changed.current?.();
     },
-    [patch],
+    [patch, purpose],
   );
 
   const retry = useCallback(

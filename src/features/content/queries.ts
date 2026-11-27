@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { z } from "zod";
 import { pageSections, site as fallbackSite } from "@/content/fallback";
 import { sectionSchemas, type SectionData, type SectionProps } from "@/features/sections/schemas";
+import type { Asset } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { tags } from "./tags";
 
@@ -16,6 +17,7 @@ import { tags } from "./tags";
 
 export type Site = typeof fallbackSite;
 export type WorkItem = SectionProps<"workGrid">["projects"][number];
+export type LoopRef = NonNullable<WorkItem["loop"]>;
 
 const socialsSchema = z.array(z.object({ label: z.string(), href: z.url() }));
 
@@ -39,6 +41,14 @@ export async function getSite(): Promise<Site> {
     whatsapp: row.whatsapp ?? fallbackSite.whatsapp,
     whatsappMessage: row.whatsappMessage ?? fallbackSite.whatsappMessage,
   };
+}
+
+/** A READY video asset with a URL → the hover loop the grid plays (Blob, #26). Anything else → none. */
+export function loopOf(
+  a: Pick<Asset, "status" | "url" | "kind" | "width" | "height"> | null | undefined,
+): LoopRef | undefined {
+  if (a?.status !== "READY" || !a.url || (a.kind && a.kind !== "VIDEO")) return undefined;
+  return { src: a.url, width: a.width ?? undefined, height: a.height ?? undefined };
 }
 
 /** Published, featured-first projects mapped to work-grid cards (hover loop only once it is READY). */
@@ -70,7 +80,7 @@ export async function getPublishedProjects(): Promise<WorkItem[]> {
           height: cover.height ?? undefined,
           blurDataUrl: cover.blurDataUrl ?? undefined,
         },
-        loopPlaybackId: p.loop?.status === "READY" ? (p.loop.playbackId ?? undefined) : undefined,
+        loop: loopOf(p.loop),
       },
     ];
   });

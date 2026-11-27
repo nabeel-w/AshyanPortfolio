@@ -31,7 +31,7 @@ const row = {
   filmOrientation: "LANDSCAPE",
   filmAspect: null,
   filmDuration: 20.1,
-  loop: { status: "READY", playbackId: "pb_loop" },
+  loop: { status: "READY", kind: "VIDEO", url: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 1080, height: 1920 },
   gallery: [{ asset: ready({ url: "https://cdn/g1.webp" }) }, { asset: ready({ status: "PROCESSING" }) }],
 };
 
@@ -65,7 +65,7 @@ describe("getProject", () => {
         watchUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         poster: { src: "https://cdn/c.webp" },
       },
-      loopPlaybackId: "pb_loop",
+      loop: { src: "https://x.public.blob.vercel-storage.com/loop.mp4", width: 1080, height: 1920 },
       next: { slug: "mumbai", title: "Mumbai" },
     });
     // gallery skips assets that aren't ready yet

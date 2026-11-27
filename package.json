@@ -23,7 +23,8 @@
     "test:components": "vitest run --project components",
     "test:coverage": "vitest run --coverage",
     "analytics:rollup": "tsx --conditions=react-server scripts/analytics-rollup.ts",
-    "seed:media": "tsx --conditions=react-server scripts/seed-media.ts"
+    "seed:media": "tsx --conditions=react-server scripts/seed-media.ts",
+    "media:loops-to-blob": "tsx --conditions=react-server scripts/loops-to-blob.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

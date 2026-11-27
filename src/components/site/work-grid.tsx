@@ -111,7 +111,7 @@ function WorkCard({
           className="object-cover transition-[transform,filter] duration-[1.4s] ease-out-expo group-hover:scale-[1.04] md:brightness-[0.82] md:group-hover:brightness-100"
         />
         {/* Hover (desktop) / in-view (touch) preview loop over the hi-res still */}
-        {project.loopPlaybackId ? <VideoLoop playbackId={project.loopPlaybackId} /> : null}
+        {project.loop ? <VideoLoop src={project.loop.src} /> : null}
         {/* Playhead sweep */}
         <span
           aria-hidden

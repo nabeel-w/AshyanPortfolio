@@ -15,6 +15,7 @@ const uploadRequest = z.object({
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(100),
   bytes: z.number().int().positive(),
+  purpose: z.enum(["loop"]).optional(),
 });
 
 export async function createUploadAction(input: z.input<typeof uploadRequest>) {
@@ -96,15 +97,18 @@ const driveIds = z
 export type DriveImportResult = { fileId: string; assetId?: string; error?: string };
 
 /** Import files the admin just picked in the Google Picker. Each becomes an UPLOADING asset that fills server-side. */
-export async function importFromDriveAction(fileIds: string[]): Promise<DriveImportResult[]> {
+export async function importFromDriveAction(fileIds: string[], purpose?: "loop"): Promise<DriveImportResult[]> {
   const session = await requireAdmin();
   const ids = driveIds.parse(fileIds);
+  const why = z.enum(["loop"]).optional().parse(purpose);
   const account = await googleAccountFor("drive", session.user.id);
   if (!account) throw new Error("Connect Google Drive first.");
   const results: DriveImportResult[] = [];
   for (const fileId of ids) {
     try {
-      const assetId = await imports.createDriveImport(account.id, fileId);
+      const assetId = why
+        ? await imports.createDriveImport(account.id, fileId, why)
+        : await imports.createDriveImport(account.id, fileId);
       await imports.kickImport(assetId);
       results.push({ fileId, assetId });
     } catch (e) {
