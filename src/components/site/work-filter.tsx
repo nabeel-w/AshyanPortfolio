@@ -22,9 +22,13 @@ export function WorkFilter({ children }: { children: React.ReactNode }) {
       let shown = 0;
       section.querySelectorAll<HTMLElement>("[data-labels]").forEach((item) => {
         const match = !known || (item.dataset.labels ?? "").split(" ").includes(known);
-        // The home teaser's limit doesn't apply on /work, but keep any server-hidden overflow consistent.
         item.hidden = !match;
-        if (match) shown++;
+        if (match) {
+          shown++;
+          // Number the visible films 01, 02… so a filtered grid doesn't start at 03.
+          const index = item.querySelector<HTMLElement>("[data-work-index]");
+          if (index) index.textContent = String(shown).padStart(2, "0");
+        }
       });
       root.querySelectorAll<HTMLAnchorElement>("[data-label-chip]").forEach((a) => {
         const active = a.dataset.labelChip === (known ?? "all");

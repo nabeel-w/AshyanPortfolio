@@ -31,7 +31,7 @@ export function VideoLoop({ src: loopSrc, poster, className }: { src: string; po
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || connection?.saveData) return;
 
     const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-    const scope = video.closest<HTMLElement>("a, [data-loop-scope]") ?? video.parentElement!;
+    const scope = video.closest<HTMLElement>("[data-loop-scope]") ?? video.parentElement!;
     const start = () => {
       setSrc((s) => s ?? loopSrc);
       claim(video);

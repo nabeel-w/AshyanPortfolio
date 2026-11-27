@@ -193,6 +193,15 @@ enum VideoOrientation {
   SQUARE
 }
 
+/// Bento tile override for a project (#29). AUTO = from the film's orientation (src/features/sections/bento.ts)
+enum CardSize {
+  AUTO
+  FEATURE
+  WIDE
+  TALL
+  SQUARE
+}
+
 /// A managed work label ("Fashion", "Reels"…). Several per project; each visible label with work has
 /// an indexable page at /work/label/<slug>. See docs/02 "Labels".
 model Label {
@@ -255,6 +264,8 @@ model Project {
   body        Json?
   credits     Json?         // [{ role, name }]
   featured    Boolean       @default(false)
+  /// Work-grid tile shape; AUTO picks it from the film orientation
+  cardSize    CardSize      @default(AUTO)
   order       Int           @default(0)
   status      PublishStatus @default(DRAFT)
   publishedAt DateTime?

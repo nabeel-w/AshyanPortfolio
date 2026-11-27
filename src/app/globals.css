@@ -210,6 +210,29 @@
   .container-site {
     @apply mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10;
   }
+
+  /*
+   * Bento work grid (#29). 2 columns below lg, 4 from lg. Rows are sized from the column width
+   * (container query units on .bento-scope), so a tall tile (1 col × 2 rows + gap) is exactly 9:16 and
+   * nothing moves while images load (CLS 0). `dense` back-fills holes when a filter hides tiles.
+   */
+  .bento-scope {
+    container-type: inline-size;
+  }
+  .bento {
+    --cols: 2;
+    --gap: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-flow: row dense;
+    grid-auto-rows: calc((100cqi - (var(--cols) - 1) * var(--gap)) / var(--cols) * 8 / 9 - var(--gap) / 2);
+    gap: var(--gap);
+  }
+  @media (width >= 64rem) {
+    .bento {
+      --cols: 4;
+    }
+  }
 }
 
 @utility marquee {

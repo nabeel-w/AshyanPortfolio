@@ -56,13 +56,18 @@ describe("Work filter", () => {
     await user.click(within(nav).getByRole("link", { name: /Fashion/ }));
     expect(within(nav).getByRole("link", { name: /Fashion/ })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: /All/ })).not.toHaveAttribute("aria-current");
-    expect(shown().map((li) => li.dataset.labels)).toEqual(["fashion"]);
-    expect(container.querySelector("[data-work-count]")).toHaveTextContent("01");
+    expect(shown().map((li) => li.dataset.labels)).toEqual(["reels fashion", "fashion"]);
+    expect(container.querySelector("[data-work-count]")).toHaveTextContent("02");
     expect(window.location.search).toBe("?label=fashion");
+    // Visible films are renumbered from 01, and a near-empty filter shows the "more coming" tile
+    expect(shown().map((li) => li.querySelector("[data-work-index]")!.textContent)).toEqual(["01", "02"]);
+    expect(container.querySelector("[data-work-empty]")).not.toHaveAttribute("hidden");
+    expect(container.querySelector("[data-work-empty-label]")).toHaveTextContent("fashion");
 
     await user.click(within(nav).getByRole("link", { name: /All/ }));
-    expect(shown()).toHaveLength(5);
-    expect(container.querySelector("[data-work-count]")).toHaveTextContent("05");
+    expect(shown()).toHaveLength(7);
+    expect(container.querySelector("[data-work-count]")).toHaveTextContent("07");
+    expect(container.querySelector("[data-work-empty]")).toHaveAttribute("hidden");
     expect(window.location.search).toBe("");
   });
 

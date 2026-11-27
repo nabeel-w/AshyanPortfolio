@@ -172,6 +172,9 @@ describe("getPublishedPage", () => {
         format: "Commercial",
         year: 2026,
         labels: [{ name: "Commercial", slug: "commercial" }],
+        orientation: "landscape",
+        cardSize: "auto",
+        featured: undefined,
         cover: {
           src: "https://cdn/real.webp",
           alt: "Real",
@@ -282,7 +285,7 @@ describe("labels (#28)", () => {
     db.label.count.mockResolvedValue(0);
     db.page.findFirst.mockResolvedValue(null);
     const labels = await getLabels();
-    expect(labels.map((l) => l.slug)).toEqual(["commercial", "fashion", "film", "documentary"]);
+    expect(labels.map((l) => l.slug)).toEqual(["commercial", "reels", "fashion", "music-video", "film", "documentary"]);
     expect(labels[0]!.count).toBe(2);
   });
 

@@ -92,6 +92,9 @@ export function toWorkItem(p: GridRow): WorkItem | null {
       blurDataUrl: cover.blurDataUrl ?? undefined,
     },
     loop: loopOf(p.loop),
+    orientation: p.filmOrientation === "PORTRAIT" ? "portrait" : p.filmOrientation === "SQUARE" ? "square" : "landscape",
+    cardSize: (p.cardSize?.toLowerCase() ?? "auto") as WorkItem["cardSize"],
+    featured: p.featured,
   };
 }
 

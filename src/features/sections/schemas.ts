@@ -71,6 +71,11 @@ export const workGridSchema = z.object({
         cover: mediaRef,
         /** Short muted hover loop on Vercel Blob (#26) */
         loop: loopRef.optional(),
+        /** The film's shape (#24): portrait reels get tall bento tiles */
+        orientation: z.enum(["landscape", "portrait", "square"]).default("landscape"),
+        /** Admin tile override (#29) */
+        cardSize: z.enum(["auto", "feature", "wide", "tall", "square"]).default("auto"),
+        featured: z.boolean().default(false),
       }),
     )
     .default([]),

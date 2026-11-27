@@ -205,6 +205,19 @@ export function ProjectForm({
             <SchemaForm
               fields={[
                 { type: "switch", name: "featured", label: "Featured (shown first)" },
+                {
+                  type: "select",
+                  name: "cardSize",
+                  label: "Grid tile",
+                  options: [
+                    { value: "AUTO", label: "Automatic (from the film’s shape)" },
+                    { value: "FEATURE", label: "Feature · 2 × 2" },
+                    { value: "WIDE", label: "Wide · 2 × 1" },
+                    { value: "TALL", label: "Tall · 1 × 2 (reels)" },
+                    { value: "SQUARE", label: "Square · 1 × 1" },
+                  ],
+                  help: "Automatic: portrait films get a tall tile, square films a square one, and the first featured landscape film the big feature tile.",
+                },
                 { type: "number", name: "order", label: "Order", min: 0, help: "Lower numbers come first." },
                 ...seoFields,
               ]}

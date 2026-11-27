@@ -37,6 +37,8 @@ const projectInput = z.object({
   transcript: optionalText(50000),
   credits: z.array(z.object({ role: z.string().trim().max(80), name: z.string().trim().max(120) })).default([]),
   featured: z.boolean().default(false),
+  /** Bento tile override (#29); AUTO = from the film's orientation */
+  cardSize: z.enum(["AUTO", "FEATURE", "WIDE", "TALL", "SQUARE"]).default("AUTO"),
   order: z.coerce.number().int().min(0).max(9999).default(0),
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
   coverId: optionalId,
@@ -101,6 +103,7 @@ export async function saveProject(id: string | null, raw: ProjectInput): Promise
     transcript: input.transcript,
     credits: input.credits.filter((c) => c.role || c.name) as Prisma.InputJsonValue,
     featured: input.featured,
+    cardSize: input.cardSize,
     order: input.order,
     status: input.status,
     publishedAt: input.status === "PUBLISHED" ? (previous?.publishedAt ?? new Date()) : (previous?.publishedAt ?? null),

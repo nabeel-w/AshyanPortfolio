@@ -39,6 +39,7 @@ export default async function EditProjectPage({ params }: PageProps<"/admin/proj
         transcript: p.transcript ?? "",
         credits,
         featured: p.featured,
+        cardSize: p.cardSize,
         order: p.order,
         status: p.status,
         seoTitle: p.seoTitle ?? "",

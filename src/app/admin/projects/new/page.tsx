@@ -24,6 +24,7 @@ export default async function NewProjectPage() {
         transcript: "",
         credits: [],
         featured: false,
+        cardSize: "AUTO",
         order: 0,
         status: "DRAFT",
         seoTitle: "",

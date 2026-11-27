@@ -79,15 +79,48 @@ describe("<WorkGrid>", () => {
     );
   });
 
-  it("loads the first two covers eagerly and the rest lazily", () => {
-    render(<WorkGrid {...props} />);
+  it("loads the first row eagerly, the rest lazily, and preloads only the first tile above the fold", () => {
+    const { rerender } = render(<WorkGrid {...props} />);
     expect(screen.getAllByRole("img").map((i) => i.getAttribute("loading"))).toEqual([
       "eager",
       "eager",
+      "eager",
+      "lazy",
       "lazy",
       "lazy",
       "lazy",
     ]);
+    expect(screen.getAllByRole("img").filter((i) => i.getAttribute("data-preload") === "true")).toHaveLength(0);
+    rerender(<WorkGrid {...props} position={1} />);
+    const preloaded = screen.getAllByRole("img").filter((i) => i.getAttribute("data-preload") === "true");
+    expect(preloaded).toHaveLength(1);
+    expect(preloaded[0]).toHaveAttribute("data-fetchpriority", "high");
+  });
+
+  it("gives each film a bento tile from its shape: feature, tall reels, wide long-form (#29)", () => {
+    const { container } = render(<WorkGrid {...props} />);
+    expect([...container.querySelectorAll("article")].map((a) => a.dataset.tile)).toEqual([
+      "feature",
+      "tall",
+      "tall",
+      "wide",
+      "wide",
+      "wide",
+      "wide",
+    ]);
+    const items = [...container.querySelectorAll("ul.bento > li")];
+    expect(items[0]).toHaveClass("col-span-2", "lg:row-span-2");
+    expect(items[1]).toHaveClass("row-span-2");
+    expect(items[3]).toHaveClass("col-span-2");
+    // Portrait reels get portrait-sized images, not a 16:9 crop
+    expect(container.querySelectorAll("img")[1]).toHaveAttribute("sizes", "(min-width: 1024px) 25vw, 50vw");
+  });
+
+  it("shows at most `limit` films with an All work link when there are more", () => {
+    render(<WorkGrid {...props} limit={3} />);
+    expect(document.querySelectorAll("article")).toHaveLength(3);
+    expect(screen.getByRole("link", { name: /All work · 07 films/ })).toHaveAttribute("href", "/work");
+    expect(document.querySelector("[data-work-count]")).toHaveTextContent("03");
   });
 
   it("renders label chips as real links with counts (no JS needed)", () => {
@@ -97,7 +130,9 @@ describe("<WorkGrid>", () => {
     expect(links.map((l) => l.getAttribute("href"))).toEqual([
       "/work",
       "/work/label/commercial",
+      "/work/label/reels",
       "/work/label/fashion",
+      "/work/label/music-video",
       "/work/label/film",
       "/work/label/documentary",
     ]);
