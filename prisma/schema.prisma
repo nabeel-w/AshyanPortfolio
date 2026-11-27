@@ -186,6 +186,13 @@ enum PublishStatus {
   ARCHIVED
 }
 
+/// The film's shape: drives the bento tile, the project page layout and the player box (docs/03)
+enum VideoOrientation {
+  LANDSCAPE
+  PORTRAIT
+  SQUARE
+}
+
 model Category {
   id       String    @id @default(cuid())
   name     String
@@ -224,6 +231,15 @@ model Project {
   /// Full-length film (HLS)
   filmId      String?
   film        Asset?        @relation("ProjectFilm", fields: [filmId], references: [id], onDelete: SetNull)
+  /// Canonical YouTube URL as entered (watch, youtu.be, /shorts/, /embed/, /live/). See src/lib/youtube.ts
+  filmUrl         String?
+  /// 11-char YouTube video id parsed from filmUrl
+  filmYoutubeId   String?
+  filmOrientation VideoOrientation @default(LANDSCAPE)
+  /// width / height, e.g. 1.7778 or 0.5625. Null = derive from the orientation
+  filmAspect      Float?
+  /// Seconds. YouTube oEmbed has no duration, so the admin types the runtime
+  filmDuration    Float?
   /// Short muted loop for hover previews on the grid
   loopId      String?
   loop        Asset?        @relation("ProjectLoop", fields: [loopId], references: [id], onDelete: SetNull)
@@ -237,6 +253,7 @@ model Project {
   updatedAt   DateTime      @updatedAt
 
   @@index([status, featured, order])
+  @@index([filmYoutubeId])
 }
 
 model ProjectMedia {

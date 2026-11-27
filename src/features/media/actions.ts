@@ -5,6 +5,7 @@ import { invalidate } from "@/features/content/invalidate";
 import { googleAccountFor } from "@/features/google/accounts";
 import { requireAdmin } from "@/lib/session";
 import * as imports from "./import";
+import { cleanProbe, type MediaProbe } from "./probe";
 import * as media from "./service";
 import { toAssetSummary } from "./summary";
 
@@ -21,9 +22,10 @@ export async function createUploadAction(input: z.input<typeof uploadRequest>) {
   return media.createUpload(uploadRequest.parse(input));
 }
 
-export async function completeUploadAction(assetId: string) {
+/** `probe`: width/height/duration the browser read from a video before uploading it (#24). */
+export async function completeUploadAction(assetId: string, probe?: MediaProbe) {
   await requireAdmin();
-  const asset = await media.completeUpload(z.string().cuid().parse(assetId));
+  const asset = await media.completeUpload(z.string().cuid().parse(assetId), cleanProbe(probe));
   if (asset.status === "READY") invalidate.assets();
   return {
     id: asset.id,
@@ -33,6 +35,7 @@ export async function completeUploadAction(assetId: string) {
     playbackId: asset.playbackId,
     width: asset.width,
     height: asset.height,
+    duration: asset.duration,
   };
 }
 

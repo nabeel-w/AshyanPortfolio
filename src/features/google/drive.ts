@@ -14,6 +14,8 @@ export type DriveFile = {
   mimeType: string;
   size: number;
   md5Checksum?: string;
+  /** Drive's own read of a video (the import can't probe it in a browser): width, height, ms */
+  video?: { width?: number; height?: number; durationMillis?: number };
 };
 
 /** Drive ids are URL-safe base64-ish strings. Anything else never reaches the API. */
@@ -65,7 +67,7 @@ async function token(accountId: string) {
 export async function driveFileMeta(accountId: string, fileId: string): Promise<DriveFile> {
   if (!isDriveFileId(fileId)) throw new PermanentImportError("Invalid Google Drive file id.");
   const res = await fetch(
-    `${API}/${fileId}?fields=id,name,mimeType,size,md5Checksum&supportsAllDrives=true`,
+    `${API}/${fileId}?fields=id,name,mimeType,size,md5Checksum,videoMediaMetadata&supportsAllDrives=true`,
     {
       headers: { Authorization: `Bearer ${await token(accountId)}` },
     },
@@ -77,6 +79,7 @@ export async function driveFileMeta(accountId: string, fileId: string): Promise<
     mimeType: string;
     size?: string;
     md5Checksum?: string;
+    videoMediaMetadata?: { width?: number; height?: number; durationMillis?: string | number };
   };
   // Google-native Docs/Sheets/Slides have no size and no binary content.
   if (!f.size)
@@ -89,6 +92,14 @@ export async function driveFileMeta(accountId: string, fileId: string): Promise<
     mimeType: f.mimeType,
     size: Number(f.size),
     md5Checksum: f.md5Checksum,
+    video: f.videoMediaMetadata
+      ? {
+          width: f.videoMediaMetadata.width,
+          height: f.videoMediaMetadata.height,
+          durationMillis:
+            f.videoMediaMetadata.durationMillis === undefined ? undefined : Number(f.videoMediaMetadata.durationMillis),
+        }
+      : undefined,
   };
 }
 

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getProvider, providerFor } from "./providers";
 import type { MediaKind, ProviderResult, StorageProvider, UploadInstruction } from "./types";
 import { analyzeImage } from "./image-meta";
+import type { MediaProbe } from "./probe";
 import { expectOk, kindFromMime, makeKey, maxBytes } from "./util";
 
 /**
@@ -91,14 +92,28 @@ function toUpdate(result: ProviderResult): Prisma.AssetUpdateInput {
   };
 }
 
-/** Ask the provider what happened to the upload and persist it. Safe to call repeatedly (polling). */
-export async function completeUpload(assetId: string) {
+/**
+ * Ask the provider what happened to the upload and persist it. Safe to call repeatedly (polling).
+ * `probe` fills width/height/duration the provider didn't report (Blob stores none for videos).
+ */
+export async function completeUpload(assetId: string, probe: MediaProbe = {}) {
   const asset = await db.asset.findUniqueOrThrow({ where: { id: assetId } });
   const provider = getProvider(asset.provider);
   const result = await provider.finalize(asset.providerKey, asset.kind);
   const image =
     asset.kind === "IMAGE" ? await enrichImage(provider, asset.providerKey, result) : {};
-  return db.asset.update({ where: { id: assetId }, data: { ...toUpdate(result), ...image } });
+  const shape =
+    asset.kind === "VIDEO"
+      ? {
+          width: result.width ?? probe.width ?? undefined,
+          height: result.height ?? probe.height ?? undefined,
+          duration: result.duration ?? probe.duration ?? undefined,
+        }
+      : {};
+  return db.asset.update({
+    where: { id: assetId },
+    data: { ...toUpdate(result), ...shape, ...image },
+  });
 }
 
 /** Verify + apply a provider webhook. Returns the updated asset, or null if the event was ignored. */

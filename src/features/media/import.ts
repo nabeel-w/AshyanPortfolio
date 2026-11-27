@@ -4,6 +4,7 @@ import type { AssetImport, Prisma } from "@/generated/prisma/client";
 import { tags } from "@/features/content/tags";
 import { driveFileMeta, driveReadRange } from "@/features/google/drive";
 import { db } from "@/lib/db";
+import { cleanProbe } from "./probe";
 import { completeUpload, validateUpload } from "./service";
 import { getProvider, providerFor } from "./providers";
 import {
@@ -59,6 +60,15 @@ export async function createDriveImport(accountId: string, fileId: string): Prom
     bytes: file.size,
     kind,
   });
+  // Drive reports a video's size and runtime, which a server import can't probe in a browser (#24).
+  const shape =
+    kind === "VIDEO" && file.video
+      ? cleanProbe({
+          width: file.video.width,
+          height: file.video.height,
+          duration: file.video.durationMillis === undefined ? undefined : file.video.durationMillis / 1000,
+        })
+      : {};
   const asset = await db.asset.create({
     data: {
       kind,
@@ -68,6 +78,7 @@ export async function createDriveImport(accountId: string, fileId: string): Prom
       filename: file.name,
       mimeType: file.mimeType,
       bytes: BigInt(file.size),
+      ...shape,
       meta: { import: { source: "google-drive", fileId: file.id, md5: file.md5Checksum ?? null } },
       import: {
         create: {

@@ -333,6 +333,18 @@ describe("createDriveImport", () => {
     });
   });
 
+  it("stores Drive's video size and runtime on the asset (#24)", async () => {
+    drive.driveFileMeta.mockResolvedValueOnce({
+      id: "f1234567890",
+      name: "loop.mp4",
+      mimeType: "video/mp4",
+      size: 4_000_000,
+      video: { width: 1080, height: 1920, durationMillis: 4200 },
+    });
+    const id = await createDriveImport("acc1", "f1234567890");
+    expect(store.assets.get(id)).toMatchObject({ width: 1080, height: 1920, duration: 4.2 });
+  });
+
   it("refuses providers that can't receive server imports", async () => {
     drive.driveFileMeta.mockResolvedValueOnce({
       id: "f1234567890",

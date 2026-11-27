@@ -1,6 +1,7 @@
 "use client";
 
 import { completeUploadAction, createUploadAction } from "../actions";
+import type { MediaProbe } from "../probe";
 import type { UploadInstruction } from "../types";
 
 /**
@@ -14,9 +15,49 @@ export async function uploadFile(file: File, opts: { onProgress?: (fraction: num
     mimeType: file.type || "application/octet-stream",
     bytes: file.size,
   });
+  // Read the video's shape while it uploads: Blob stores no width/height/duration for videos (#24).
+  const probe = file.type.startsWith("video/") ? probeVideo(file) : Promise.resolve(undefined);
   await send(ticket.upload, file, opts);
   opts.onProgress?.(1);
-  return completeUploadAction(ticket.assetId);
+  const meta = await probe;
+  return meta ? completeUploadAction(ticket.assetId, meta) : completeUploadAction(ticket.assetId);
+}
+
+/**
+ * Width, height and duration of a local video file, from a metadata-only <video> on an object URL.
+ * Resolves undefined when the browser can't decode it (the upload still goes through).
+ */
+export function probeVideo(file: Blob, timeoutMs = 8000): Promise<MediaProbe | undefined> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined" || typeof URL.createObjectURL !== "function") return resolve(undefined);
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    let settled = false;
+    const done = (value: MediaProbe | undefined) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      video.removeAttribute("src");
+      video.load?.();
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    const timer = setTimeout(() => done(undefined), timeoutMs);
+    video.preload = "metadata";
+    video.muted = true;
+    video.onloadedmetadata = () =>
+      done(
+        video.videoWidth && video.videoHeight
+          ? {
+              width: video.videoWidth,
+              height: video.videoHeight,
+              duration: Number.isFinite(video.duration) ? video.duration : undefined,
+            }
+          : undefined,
+      );
+    video.onerror = () => done(undefined);
+    video.src = url;
+  });
 }
 
 async function send(upload: UploadInstruction, file: File, opts: { onProgress?: (f: number) => void; signal?: AbortSignal }) {

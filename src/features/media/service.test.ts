@@ -165,6 +165,31 @@ describe("completeUpload", () => {
   });
 });
 
+describe("completeUpload: video shape (#24)", () => {
+  it("stores the browser probe on a video when the provider reports no dimensions", async () => {
+    db.asset.findUniqueOrThrow.mockResolvedValue({ id: "asset_1", kind: "VIDEO", provider: "fake", providerKey: "pk" });
+    provider.finalize.mockResolvedValue({ status: "READY", url: "https://blob/loop.mp4", bytes: 4_000_000 });
+    const asset = await completeUpload("asset_1", { width: 1080, height: 1920, duration: 4.2 });
+    expect(asset).toMatchObject({ status: "READY", width: 1080, height: 1920, duration: 4.2 });
+  });
+
+  it("prefers what the provider reports over the probe", async () => {
+    db.asset.findUniqueOrThrow.mockResolvedValue({ id: "asset_1", kind: "VIDEO", provider: "fake", providerKey: "pk" });
+    provider.finalize.mockResolvedValue({ status: "READY", width: 1920, height: 1080, duration: 10 });
+    const asset = await completeUpload("asset_1", { width: 1, height: 2, duration: 3 });
+    expect(asset).toMatchObject({ width: 1920, height: 1080, duration: 10 });
+  });
+
+  it("ignores the probe for images", async () => {
+    db.asset.findUniqueOrThrow.mockResolvedValue({ id: "asset_1", kind: "IMAGE", provider: "fake", providerKey: "pk" });
+    provider.finalize.mockResolvedValue({ status: "READY", url: "https://cdn/x.png" });
+    provider.read.mockResolvedValue(Buffer.from("img"));
+    analyzeImage.mockResolvedValue({ width: 10, height: 5 });
+    const asset = await completeUpload("asset_1", { width: 999, height: 999 });
+    expect(asset).toMatchObject({ width: 10, height: 5 });
+  });
+});
+
 describe("applyWebhook", () => {
   const req = new Request("https://x", { method: "POST", body: "{}" });
 
